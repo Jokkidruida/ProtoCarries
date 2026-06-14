@@ -71,6 +71,15 @@
   .weeknav .wk{min-width:180px; text-align:center; padding:8px 14px; border:1px solid var(--line); border-radius:10px; background:var(--bg-1)}
   .weeknav .wk .lbl{font-weight:600; font-size:14px}
   .weeknav .wk .dt{font-size:11px; color:var(--muted-2); font-family:var(--font-mono)}
+  .weeknav .wkside{min-width:115px; max-width:155px; text-align:center; padding:7px 10px; border:1px solid var(--line-soft); border-radius:10px; background:transparent; cursor:pointer; opacity:.55; transition:.15s}
+  .weeknav .wkside:hover{opacity:1; border-color:var(--blue); background:var(--bg-1)}
+  .weeknav .wkside .lbl{font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .weeknav .wkside .dt{font-size:10px; color:var(--muted-2); font-family:var(--font-mono)}
+  .weeknav .wkside.empty{cursor:default; opacity:.25; border-style:dashed; color:var(--muted-2)}
+  .weeknav .wkside.empty:hover{border-color:var(--line-soft); background:transparent}
+  .qadd{width:27px; height:27px; border-radius:8px; border:1px solid var(--line); background:var(--bg-2); color:var(--blue); font-size:17px; line-height:1; cursor:pointer; flex:none; margin-left:4px; transition:.15s}
+  .qadd:hover{border-color:var(--blue); background:var(--bg-3); transform:scale(1.06)}
+  .tag.run{color:#9fe3c0; border-color:#1d4a37}
 
   .summary{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:16px 0 8px}
   .stat{border:1px solid var(--line-soft); border-radius:12px; padding:13px 15px; background:var(--bg-1); position:relative; overflow:hidden}
@@ -283,16 +292,21 @@
   <div class="modal">
     <h3 id="modalTitle">Registrar venta</h3>
     <div class="mbody">
-      <div class="field"><label>Raid</label><select id="f_raid"></select></div>
+      <div class="row2">
+        <div class="field"><label>Raid</label><select id="f_raid"></select></div>
+        <div class="field" id="f_weekWrap"><label>Semana</label><select id="f_week"></select></div>
+      </div>
       <div class="row2">
         <div class="field"><label>Comprador (personaje)</label><input type="text" id="f_buyer" placeholder="Nombre del char"></div>
         <div class="field"><label>BattleTag / contacto</label><input type="text" id="f_btag" placeholder="Nombre#1234"></div>
       </div>
+      <div class="field" id="f_byWrap"><label>Cargó / a nombre de (podés poner a cualquiera)</label><input type="text" id="f_by" placeholder="Dejalo o poné quién hizo la venta"></div>
       <div class="field"><label>Bosses que compra<button class="linkbtn" id="pickAll" type="button" style="float:right">Clear completo</button></label><div class="bosspick" id="f_bosses"></div></div>
       <div class="row2">
         <div class="field"><label>Gold (acepta 1.5m, 500k, 750000)</label><input type="text" id="f_gold" placeholder="0"></div>
         <div class="field"><label>Estado</label><select id="f_status"></select></div>
       </div>
+      <div class="field"><label>Fecha del carry (cuándo se hace / se hizo)</label><input type="date" id="f_rundate"></div>
       <div class="field"><label>Destino del oro / cobrado por</label><input type="text" id="f_goldto" placeholder="Banco de la guild, char que cobró, split…"></div>
       <div class="field"><label>Notas (opcional)</label><textarea id="f_notes" placeholder="Acordado split, paga al terminar, etc."></textarea></div>
     </div>
@@ -365,8 +379,13 @@ const sbDel=(t,id)=> sb(t+'?id=eq.'+encodeURIComponent(id),{method:'DELETE'});
 /* ---------- util ---------- */
 const uid=()=> (Date.now().toString(36)+Math.random().toString(36).slice(2,7));
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function fmtDate(d){ const dt=new Date(d); return String(dt.getDate()).padStart(2,'0')+'/'+String(dt.getMonth()+1).padStart(2,'0'); }
-function fmtDateTime(d){ const dt=new Date(d); return fmtDate(d)+'/'+dt.getFullYear()+' '+String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0'); }
+function parseLocalDate(d){ if(d instanceof Date) return d; const s=String(d); const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m? new Date(+m[1],+m[2]-1,+m[3]) : new Date(s); }
+function isoLocal(dt){ return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
+function fmtDate(d){ const dt=parseLocalDate(d); return String(dt.getDate()).padStart(2,'0')+'/'+String(dt.getMonth()+1).padStart(2,'0'); }
+function fmtDM(d){ const dt=parseLocalDate(d); return dt.getDate()+'/'+(dt.getMonth()+1); }
+function fmtDateTime(d){ const dt=new Date(d); return String(dt.getDate()).padStart(2,'0')+'/'+String(dt.getMonth()+1).padStart(2,'0')+'/'+dt.getFullYear()+' '+String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0'); }
+function tuesdayOnOrBefore(dt){ const d=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate()); const diff=(d.getDay()-2+7)%7; d.setDate(d.getDate()-diff); return d; }
+function weekLabel(startDt){ const end=new Date(startDt); end.setDate(end.getDate()+6); return 'Semana '+fmtDM(startDt)+' a '+fmtDM(end); }
 function fmtGold(n){ return new Intl.NumberFormat('es-AR').format(Math.round(n||0))+'g'; }
 function fmtGoldShort(n){ n=Math.round(n||0); if(n>=1e6) return (n/1e6).toFixed(n%1e6?1:0).replace('.',',')+'M g'; if(n>=1e3) return Math.round(n/1e3)+'k g'; return n+' g'; }
 function parseGold(str){ if(str==null) return 0; str=String(str).trim().toLowerCase().replace(/\s/g,'').replace(/g$/,''); if(!str) return 0; let m=1; if(str.endsWith('m')){m=1e6;str=str.slice(0,-1);} else if(str.endsWith('k')){m=1e3;str=str.slice(0,-1);} if((str.match(/\./g)||[]).length>1) str=str.replace(/\./g,''); str=str.replace(',','.'); const n=parseFloat(str); return isNaN(n)?0:Math.round(n*m); }
@@ -397,7 +416,8 @@ async function refresh(toastOnChange){
 }
 async function ensureFirstWeek(){
   if(state.weeks.length||creating) return; creating=true;
-  const w={ id:uid(), label:"Lockout "+fmtDate(new Date()), date:new Date().toISOString().slice(0,10), slots:blankSlots() };
+  const start=tuesdayOnOrBefore(new Date());
+  const w={ id:uid(), label:weekLabel(start), date:isoLocal(start), slots:blankSlots() };
   try{ await sbIns('weeks',w); await fetchAll(); state.current=w.id; }catch(e){} creating=false;
 }
 async function seedAdmin(){
@@ -464,13 +484,16 @@ function renderSemana(){
   const c=document.getElementById('content');
   if(!state.current){ c.innerHTML='<div class="empty" style="padding:60px"><b>Sin semanas todavía</b>'+(cap('manageWeek')?'Creá la primera con “+ Semana”.':'Esperá a que un officer/admin cree la primera semana.')+'</div>'; return; }
   const w=curWeek(); const idx=state.weeks.findIndex(x=>x.id===state.current);
+  const prevWk=state.weeks[idx-1], nextWk=state.weeks[idx+1];
   const totalGold=w.sales.reduce((a,s)=>a+(s.gold||0),0);
   const paidGold=w.sales.filter(s=>s.status==='pagado').reduce((a,s)=>a+(s.gold||0),0);
   let openSlots=0; RAID_KEYS.forEach(k=>RAIDS[k].bosses.forEach(b=>{ openSlots+=Math.max(0,((w.slots[k]||{})[b]??DEFAULT_SLOTS)-soldFor(w,k,b)); }));
   let html=`<div class="wbar"><div class="weeknav">
+      ${prevWk?`<div class="wkside" data-go="${prevWk.id}"><div class="lbl">${esc(prevWk.label)}</div><div class="dt">reset ${fmtDate(prevWk.date)}</div></div>`:`<div class="wkside empty">—</div>`}
       <button class="iconbtn" id="prevW" ${idx<=0?'disabled':''}>‹</button>
       <div class="wk"><div class="lbl">${esc(w.label)}</div><div class="dt">reset ${fmtDate(w.date)}</div></div>
       <button class="iconbtn" id="nextW" ${idx>=state.weeks.length-1?'disabled':''}>›</button>
+      ${nextWk?`<div class="wkside" data-go="${nextWk.id}"><div class="lbl">${esc(nextWk.label)}</div><div class="dt">reset ${fmtDate(nextWk.date)}</div></div>`:`<div class="wkside empty">—</div>`}
     </div><div class="actions">
       ${cap('manageWeek')?`<button class="btn ghost sm" id="renameW">✎ Semana</button><button class="btn ghost sm danger" id="delW">🗑</button><button class="btn ghost" id="newW">+ Semana</button>`:``}
       ${cap('addSale')?`<button class="btn primary" id="openSale">+ Venta</button>`:``}
@@ -485,6 +508,7 @@ function renderSemana(){
   c.innerHTML=html;
   document.getElementById('prevW').onclick=()=>{ if(idx>0){ state.current=state.weeks[idx-1].id; render(); } };
   document.getElementById('nextW').onclick=()=>{ if(idx<state.weeks.length-1){ state.current=state.weeks[idx+1].id; render(); } };
+  document.querySelectorAll('.wkside[data-go]').forEach(el=> el.onclick=()=>{ state.current=el.dataset.go; render(); });
   if(cap('addSale')) document.getElementById('openSale').onclick=()=>openSale(null);
   if(cap('manageWeek')){ document.getElementById('newW').onclick=addWeek; document.getElementById('renameW').onclick=renameWeek; document.getElementById('delW').onclick=deleteWeek;
     document.querySelectorAll('.slotin').forEach(inp=> inp.onchange=async()=>{ const v=Math.max(0,parseInt(inp.value)||0); const wk=curWeek(); wk.slots[inp.dataset.raid]=wk.slots[inp.dataset.raid]||{}; wk.slots[inp.dataset.raid][inp.dataset.boss]=v; renderSemana();
@@ -493,6 +517,7 @@ function renderSemana(){
   document.querySelectorAll('.btag').forEach(b=> b.onclick=()=>{ copyText(b.dataset.copy); toast('Copiado: '+b.dataset.copy); });
   document.querySelectorAll('.miniop.edit').forEach(b=> b.onclick=()=>openSale(b.dataset.id));
   document.querySelectorAll('.miniop.del').forEach(b=> b.onclick=()=>delSale(b.dataset.id));
+  document.querySelectorAll('.qadd').forEach(b=> b.onclick=()=> openSale(null,{raid:b.dataset.raid,boss:b.dataset.boss}));
 }
 function renderRaid(k,w){
   const R=RAIDS[k]; const raidGold=w.sales.filter(s=>s.raid===k).reduce((a,s)=>a+(s.gold||0),0);
@@ -503,7 +528,7 @@ function renderRaid(k,w){
     for(let i=0;i<shown;i++){ const cls=i<sold?(i<total?'sold':'over'):''; pips+=`<span class="pip ${cls}"></span>`; }
     let st,scls; if(vac>0){st=vac+' vacante'+(vac>1?'s':'');scls='open';} else if(vac===0){st='completo';scls='full';} else{st='+'+(-vac)+' extra';scls='over';}
     const slotCell = cap('editSlots') ? `<input class="slotin" type="number" min="0" value="${total}" data-raid="${k}" data-boss="${esc(b)}"><div class="slothint">cupos</div>` : `<div class="slotstat">${total}</div><div class="slothint">cupos</div>`;
-    bossRows+=`<div class="boss"><div class="bn"><div class="nm">${esc(b)}</div><div class="meta">${sold}/${total} vendidas</div></div><div class="pips">${pips}</div><div class="vstate ${scls}">${st}</div><div>${slotCell}</div></div>`;
+    bossRows+=`<div class="boss"><div class="bn"><div class="nm">${esc(b)}</div><div class="meta">${sold}/${total} vendidas</div></div><div class="pips">${pips}</div><div class="vstate ${scls}">${st}</div><div>${slotCell}</div>${(cap('addSale')&&vac>0)?`<button class="qadd" data-raid="${k}" data-boss="${esc(b)}" title="Cargar venta de ${esc(b)}">+</button>`:''}</div>`;
   });
   const sales=w.sales.filter(s=>s.raid===k);
   let saleHtml = !sales.length ? `<div class="empty"><b>Sin ventas todavía</b>${cap('addSale')?'Tocá “+ Venta” para anotar un comprador.':'Sin registros.'}</div>`
@@ -514,6 +539,7 @@ function renderRaid(k,w){
         <div class="r2"><span class="badge ${s.status}">${STATUS_LABEL[s.status]||s.status}</span>
           ${s.btag?`<span class="btag" data-copy="${esc(s.btag)}">${esc(s.btag)}</span>`:''}
           ${bossTags}${s.gold_to?`<span class="tag dest">→ ${esc(s.gold_to)}</span>`:''}
+          ${s.run_date?`<span class="tag run">carry: ${fmtDate(s.run_date)}</span>`:''}
           ${s.created_by?`<span class="tag by">cargó: ${esc(s.created_by)}</span>`:''}${ops}</div>
         ${s.notes?`<div class="note">${esc(s.notes)}</div>`:''}</div>`;
     }).join('')+'</div>';
@@ -582,11 +608,11 @@ function renderAuditoria(){
      <div class="stat"><div class="k">Bosses vendidos (kills)</div><div class="v blue">${kills}</div></div>
    </div>
    <div class="sectitle">Ventas en el período</div>
-   <div class="tablewrap"><table class="aud"><thead><tr><th>Semana</th><th>Raid</th><th>Bosses</th><th>Comprador</th><th>Gold</th><th>Estado</th><th>Destino</th><th>Cargó</th><th>Últ. edición</th></tr></thead><tbody>
+   <div class="tablewrap"><table class="aud"><thead><tr><th>Semana</th><th>Raid</th><th>Bosses</th><th>Comprador</th><th>Gold</th><th>Estado</th><th>Carry</th><th>Destino</th><th>Cargó</th><th>Últ. edición</th></tr></thead><tbody>
    ${rows.length? rows.map(s=>{
       const bosses=(s.bosses||[]).length===RAIDS[s.raid].bosses.length?'Clear completo':(s.bosses||[]).join(', ');
       const upd=s.updated_by?`${esc(s.updated_by)} · ${s.updated_at?fmtDateTime(s.updated_at):''}`:'—';
-      return `<tr><td>${esc(s.weekLabel)}<div class="mono" style="font-size:10px">${fmtDate(s.weekDate)}</div></td><td>${esc(RAIDS[s.raid].name)}</td><td>${esc(bosses)}</td><td>${esc(s.buyer)||'—'}</td><td class="g">${fmtGold(s.gold)}</td><td><span class="badge ${s.status}">${STATUS_LABEL[s.status]||s.status}</span></td><td>${esc(s.gold_to)||'<span class="mono">—</span>'}</td><td class="mono">${esc(s.created_by)||'—'}</td><td class="mono">${upd}</td></tr>`;
+      return `<tr><td>${esc(s.weekLabel)}<div class="mono" style="font-size:10px">${fmtDate(s.weekDate)}</div></td><td>${esc(RAIDS[s.raid].name)}</td><td>${esc(bosses)}</td><td>${esc(s.buyer)||'—'}</td><td class="g">${fmtGold(s.gold)}</td><td><span class="badge ${s.status}">${STATUS_LABEL[s.status]||s.status}</span></td><td class="mono">${s.run_date?fmtDate(s.run_date):'—'}</td><td>${esc(s.gold_to)||'<span class="mono">—</span>'}</td><td class="mono">${esc(s.created_by)||'—'}</td><td class="mono">${upd}</td></tr>`;
    }).join('') : `<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--muted-2)">Sin resultados.</td></tr>`}
    </tbody></table></div>
    <div class="sectitle">A dónde fue el oro</div><div class="destbox">${destRows}</div>
@@ -602,8 +628,8 @@ function renderAuditoria(){
   setP('exportCsv').onclick=exportAuditCSV;
 }
 function exportAuditCSV(){
-  const rows=[['Semana','Fecha','Raid','Bosses','Comprador','BattleTag','Gold','Estado','Destino','Cargó','UltimaEdicionPor','UltimaEdicionFecha','Notas']];
-  filteredAudit().forEach(s=> rows.push([s.weekLabel,s.weekDate,RAIDS[s.raid].name,(s.bosses||[]).join(' | '),s.buyer||'',s.btag||'',s.gold||0,s.status,s.gold_to||'',s.created_by||'',s.updated_by||'',s.updated_at||'',s.notes||'']));
+  const rows=[['Semana','Fecha','Raid','Bosses','Comprador','BattleTag','Gold','Estado','FechaCarry','Destino','Cargó','UltimaEdicionPor','UltimaEdicionFecha','Notas']];
+  filteredAudit().forEach(s=> rows.push([s.weekLabel,s.weekDate,RAIDS[s.raid].name,(s.bosses||[]).join(' | '),s.buyer||'',s.btag||'',s.gold||0,s.status,s.run_date||'',s.gold_to||'',s.created_by||'',s.updated_by||'',s.updated_at||'',s.notes||'']));
   const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\r\n');
   const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='auditoria-carries.csv'; a.click(); URL.revokeObjectURL(a.href); toast('CSV exportado');
 }
@@ -630,8 +656,8 @@ function renderUsuarios(){
 }
 
 /* ---------- weeks ---------- */
-async function addWeek(){ if(!cap('manageWeek')) return; const last=state.weeks[state.weeks.length-1]; const base=last?new Date(last.date):new Date(); base.setDate(base.getDate()+7);
-  const w={ id:uid(), label:"Lockout "+fmtDate(base), date:base.toISOString().slice(0,10), slots: last?JSON.parse(JSON.stringify(last.slots)):blankSlots() };
+async function addWeek(){ if(!cap('manageWeek')) return; const last=state.weeks[state.weeks.length-1]; let start; if(last){ start=parseLocalDate(last.date); start.setDate(start.getDate()+7); } else { start=tuesdayOnOrBefore(new Date()); }
+  const w={ id:uid(), label:weekLabel(start), date:isoLocal(start), slots: last?JSON.parse(JSON.stringify(last.slots)):blankSlots() };
   try{ await sbIns('weeks',w); logAction('crear_semana','week',w.id,{label:w.label}); await refresh(); state.current=w.id; view='semana'; render(); toast('Nueva semana creada'); }catch(e){ toast('No se pudo crear'); } }
 async function renameWeek(){ if(!cap('manageWeek')) return; const w=curWeek(); if(!w) return; const nl=prompt('Nombre de la semana:',w.label); if(nl===null) return; const nd=prompt('Fecha de reset (AAAA-MM-DD):',w.date)||w.date;
   try{ await sbUpd('weeks',w.id,{label:nl.trim()||w.label,date:nd}); logAction('renombrar_semana','week',w.id,{label:nl.trim()||w.label}); await refresh(); render(); toast('Semana actualizada'); }catch(e){ toast('No se pudo'); } }
@@ -645,23 +671,31 @@ function buildBossPicker(raidKey,selected){ const w=curWeek(); const box=documen
   box.innerHTML=RAIDS[raidKey].bosses.map(b=>{ const total=(w.slots[raidKey]||{})[b]??DEFAULT_SLOTS; let sold=soldFor(w,raidKey,b); if(editingId){ const ex=w.sales.find(s=>s.id===editingId); if(ex&&ex.raid===raidKey&&(ex.bosses||[]).includes(b)) sold-=1; } const left=total-sold; const full=left<=0; const checked=selected.includes(b);
     return `<div class="pkrow"><label class="cb ${checked?'has':''}"><input type="checkbox" value="${esc(b)}" ${checked?'checked':''}><span>${esc(b)}</span></label>${full?`<span class="full">lleno</span>`:`<span class="full" style="color:var(--muted-2)">${left} libre${left>1?'s':''}</span>`}</div>`; }).join('');
   box.querySelectorAll('input[type=checkbox]').forEach(cb=> cb.onchange=()=> cb.closest('label').classList.toggle('has',cb.checked)); }
-function openSale(id){ if(!state.current){ toast('Primero tiene que existir una semana'); return; }
+function openSale(id, preset){ if(!state.current){ toast('Primero tiene que existir una semana'); return; }
   editingId=id; const w=curWeek(); const sel=document.getElementById('f_raid'); sel.innerHTML=RAID_KEYS.map(k=>`<option value="${k}">${esc(RAIDS[k].name)}</option>`).join('');
   const opts=statusOptions(); document.getElementById('f_status').innerHTML=opts.map(s=>`<option value="${s}">${STATUS_LABEL[s]}</option>`).join('');
-  let data={ raid:RAID_KEYS[0], buyer:'', btag:'', bosses:[], gold:0, status:'reservado', gold_to:'', notes:'' };
+  const wkSel=document.getElementById('f_week'); wkSel.innerHTML=state.weeks.map(x=>`<option value="${x.id}">${esc(x.label)}</option>`).join('');
+  document.getElementById('f_weekWrap').style.display=cap('editAny')?'':'none';
+  document.getElementById('f_byWrap').style.display=cap('editAny')?'':'none';
+  let data={ raid:(preset&&preset.raid)||RAID_KEYS[0], buyer:'', btag:'', bosses:(preset&&preset.boss)?[preset.boss]:[], gold:0, status:opts[0], gold_to:'', notes:'', run_date:'', week_id:state.current, created_by:me() };
   if(id){ const ex=w.sales.find(s=>s.id===id); if(ex) data={...ex}; }
   document.getElementById('modalTitle').textContent=id?'Editar venta':'Registrar venta';
-  sel.value=data.raid; document.getElementById('f_buyer').value=data.buyer||''; document.getElementById('f_btag').value=data.btag||'';
+  sel.value=data.raid; wkSel.value=data.week_id||state.current;
+  document.getElementById('f_buyer').value=data.buyer||''; document.getElementById('f_btag').value=data.btag||'';
+  document.getElementById('f_by').value=data.created_by||me();
   document.getElementById('f_gold').value=data.gold?data.gold:''; document.getElementById('f_status').value=opts.includes(data.status)?data.status:opts[0];
   document.getElementById('f_goldto').value=data.gold_to||''; document.getElementById('f_notes').value=data.notes||'';
+  document.getElementById('f_rundate').value=data.run_date?String(data.run_date).slice(0,10):'';
   buildBossPicker(data.raid,data.bosses||[]); sel.onchange=()=> buildBossPicker(sel.value,[]);
   document.getElementById('scrim').classList.add('on'); setTimeout(()=>document.getElementById('f_buyer').focus(),50); }
 function closeSale(){ document.getElementById('scrim').classList.remove('on'); editingId=null; }
-async function saveSaleFn(){ const w=curWeek(); const raid=document.getElementById('f_raid').value; const bosses=[...document.querySelectorAll('#f_bosses input:checked')].map(c=>c.value); if(!bosses.length){ toast('Elegí al menos un boss'); return; }
-  const now=new Date().toISOString();
-  const base={ week_id:w.id, raid, buyer:document.getElementById('f_buyer').value.trim(), btag:document.getElementById('f_btag').value.trim(), bosses, gold:parseGold(document.getElementById('f_gold').value), status:document.getElementById('f_status').value, gold_to:document.getElementById('f_goldto').value.trim(), notes:document.getElementById('f_notes').value.trim() };
-  try{ if(editingId){ const patch={...base, updated_by:me(), updated_at:now}; await sbUpd('sales',editingId,patch); logAction('editar_venta','sale',editingId,{buyer:base.buyer,gold:base.gold}); }
-    else{ const rec={ id:uid(), ...base, created_by:me(), updated_by:null, updated_at:null }; await sbIns('sales',rec); logAction('crear_venta','sale',rec.id,{buyer:base.buyer,gold:base.gold}); }
+async function saveSaleFn(){ const raid=document.getElementById('f_raid').value; const bosses=[...document.querySelectorAll('#f_bosses input:checked')].map(c=>c.value); if(!bosses.length){ toast('Elegí al menos un boss'); return; }
+  const val=id=>document.getElementById(id).value.trim(); const now=new Date().toISOString();
+  const ex = editingId ? curWeek().sales.find(s=>s.id===editingId) : null;
+  const week_id = cap('editAny') ? (document.getElementById('f_week').value||state.current) : (ex? ex.week_id : state.current);
+  const base={ week_id, raid, buyer:val('f_buyer'), btag:val('f_btag'), bosses, gold:parseGold(document.getElementById('f_gold').value), status:document.getElementById('f_status').value, gold_to:val('f_goldto'), notes:val('f_notes'), run_date:document.getElementById('f_rundate').value||null };
+  try{ if(editingId){ const patch={...base, updated_by:me(), updated_at:now}; if(cap('editAny')) patch.created_by = val('f_by')||(ex&&ex.created_by)||me(); await sbUpd('sales',editingId,patch); logAction('editar_venta','sale',editingId,{buyer:base.buyer,gold:base.gold}); }
+    else{ const by = cap('editAny') ? (val('f_by')||me()) : me(); const rec={ id:uid(), ...base, created_by:by, updated_by:null, updated_at:null }; await sbIns('sales',rec); logAction('crear_venta','sale',rec.id,{buyer:base.buyer,gold:base.gold}); }
     closeSale(); await refresh(); toast(editingId?'Venta actualizada':'Venta registrada');
   }catch(e){ toast('No se pudo guardar (¿faltan columnas nuevas?)'); setLive('err','error'); } }
 async function delSale(id){ const w=curWeek(); const s=w&&w.sales.find(x=>x.id===id); if(!cap('delSale')) return; if(s&&!confirm('¿Borrar la venta de "'+(s.buyer||'?')+'"?')) return;
