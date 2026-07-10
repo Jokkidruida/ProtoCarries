@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-5TBAp6wpIaRvcz8UhHsuH2VttrsUZjpD2pPQe/Gj1fI='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-4tFQn9BJSjSDsniqf1VW9acakMg9/4arajoCVQ2tu5g='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co">
 <title>PROTOTYPE · Registro de Carries</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap');
@@ -723,33 +723,18 @@ async function manualSync(btn){
 }
 async function manualWclSync(ch,btn){
   const orig=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.textContent='Actualizando WCL…'; }
-  const zones=[46,47,50], difficulties=[5,4,3,2], metrics=['dps','hps','playerspeed','bossdps'];
-  const batches=[];
-  zones.forEach(zoneId=>{
-    const ds=zoneId===47?[0]:difficulties;
-    ds.forEach(difficulty=>metrics.forEach(metric=>batches.push({zoneId,difficulty,metric})));
-  });
-  const total=batches.length;
-  let done=0, synced=0, failed=0, failedSamples=[];
+  const zoneId=Number(singleWclZone||46), difficulty=zoneId===47?0:Number(singleWclDifficulty||5), metric=singleWclMetric||'dps';
   try{
-    for(const batch of batches){
-      done++;
-      if(btn) btn.textContent=`WCL ${done}/${total}`;
-      try{
-        const r=await fetch(SUPABASE_URL+'/functions/v1/sync-warcraftlogs',{ method:'POST', headers:edgeHeaders(true), body:JSON.stringify({ fullSync:true, zoneIds:[batch.zoneId], difficulties:[batch.difficulty], metrics:[batch.metric] }) });
-        const j=await r.json().catch(()=>({}));
-        if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
-        synced+=Number(j.synced||0);
-        failed+=(j.failed||[]).length;
-        if(j.failed&&j.failed.length) failedSamples.push(...j.failed.slice(0,3));
-      }catch(e){ failed++; failedSamples.push({zoneId:batch.zoneId,difficulty:batch.difficulty,metric:batch.metric,error:e&&e.message?e.message:String(e)}); }
-    }
-    toast(`Warcraft Logs actualizado (${synced})${failed?' · '+failed+' con error':''}`);
-    if(failedSamples.length) console.warn('WCL sync failures', failedSamples.slice(0,12));
-    logAction('sync_warcraftlogs','roster',null,{synced,failed,batches:total,sample:failedSamples.slice(0,5)});
+    const r=await fetch(SUPABASE_URL+'/functions/v1/sync-warcraftlogs',{ method:'POST', headers:edgeHeaders(true), body:JSON.stringify({ scope:'character', characterId:ch.id, zoneIds:[zoneId], difficulties:[difficulty], metrics:[metric] }) });
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.error||j.message||('HTTP '+r.status));
+    const failed=(j.failed||[]).length;
+    toast(`Warcraft Logs actualizado (${j.synced||0})${failed?' · '+failed+' con error':''}`);
+    if(failed) console.warn('WCL sync failures', j.failed.slice(0,12));
+    logAction('sync_warcraftlogs','character',ch.id,{synced:j.synced||0,failed,zoneId,difficulty,metric});
     await refresh(true);
   }catch(e){ toast('WCL todavía no está conectado'); }
-  finally{ if(btn){ btn.disabled=false; btn.textContent=orig||'↻ WCL roster'; } }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=orig||'↻ WCL'; } }
 }
 async function manualRaiderSync(ch,btn){
   const orig=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.textContent='Actualizando…'; }
@@ -1383,6 +1368,7 @@ function compactExternalError(msg){
     .replace(/<[^>]+>/g,' ')
     .replace(/\s+/g,' ')
     .trim();
+  if(/429|too many requests/i.test(s)) return 'Warcraft Logs limitó temporalmente la API. Se reintenta automático por tandas y no hace falta tocar nada.';
   return s.length>220 ? s.slice(0,220)+'…' : s;
 }
 function singleRaiderPanel(ch){
@@ -1578,7 +1564,7 @@ function singleWclPanel(ch){
   const metricOpts=Object.entries(WCL_METRIC_LABEL).map(([k,v])=>`<option value="${k}" ${k===singleWclMetric?'selected':''}>${esc(v)}</option>`).join('');
   const diffOpts=Object.entries(WCL_DIFF_LABEL).map(([k,v])=>`<option value="${k}" ${String(k)===String(singleWclDifficulty)?'selected':''}>${esc(v)}</option>`).join('');
   const diffControl=isMplusSelected ? '' : `<select id="wclDifficulty">${diffOpts}</select>`;
-  const controls=`<div class="wclControls"><select id="wclZone">${zoneOpts}</select><select id="wclMetric">${metricOpts}</select>${diffControl}<button class="btn ghost sm" id="wclSync">↻ WCL roster</button></div>`;
+  const controls=`<div class="wclControls"><select id="wclZone">${zoneOpts}</select><select id="wclMetric">${metricOpts}</select>${diffControl}<button class="btn ghost sm" id="wclSync">↻ WCL</button></div>`;
   if(!row){
     return `<div class="panel wclPanel"><div class="wclHead"><h2>Warcraft Logs</h2>${controls}</div><div class="pbody"><div class="singleEmpty">Sin datos WCL sincronizados para ${esc(ch.name)}. Cuando esté deployada <code>sync-warcraftlogs</code>, el botón ↻ WCL va a poblar esta vista.</div></div></div>`;
   }
@@ -1609,7 +1595,7 @@ function singleWclPanel(ch){
     ? `<tr><th>Dungeon</th><th>Points</th><th>Level</th><th>${esc(WCL_AMOUNT_LABEL[singleWclMetric]||'Highest')}</th><th>Kills</th><th>Rank</th></tr>`
     : `<tr><th>Boss</th><th>Best %</th><th>${esc(WCL_AMOUNT_LABEL[singleWclMetric]||'Highest')}</th><th>Kills</th><th>Rank</th></tr>`;
   const emptyColspan=isMplus?6:5;
-  const emptyText=row.synced_ok===false && row.last_error ? `WCL no devolvió datos: ${esc(row.last_error)}` : 'Sin rankings para este filtro.';
+  const emptyText=row.synced_ok===false && row.last_error ? `WCL no devolvió datos: ${esc(compactExternalError(row.last_error))}` : 'Sin rankings para este filtro.';
   return `<div class="panel wclPanel">
     <div class="wclHead"><h2>Warcraft Logs · ${esc(selectedZone&&selectedZone.expansion_name||row.expansion_name||'Midnight')}</h2>${controls}</div>
     <div class="wclKpis">
