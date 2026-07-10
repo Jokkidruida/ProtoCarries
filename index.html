@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-4tFQn9BJSjSDsniqf1VW9acakMg9/4arajoCVQ2tu5g='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-jNY7ZqZsa43fWB9YMnOUo27c6VtamALXuCn8cLmt9BU='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co">
 <title>PROTOTYPE · Registro de Carries</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap');
@@ -467,7 +467,29 @@
   .progBoss{font-size:11.5px; font-weight:700; color:var(--text); line-height:1.15; overflow-wrap:anywhere}
   .progDiff,.progKills{font-family:var(--font-mono); font-size:14px; line-height:1; font-weight:900; text-align:right}
   .prog-m{color:#a335ee}.prog-h{color:#0070ff}.prog-n{color:#1eff00}.prog-l{color:#fff}.prog-none{color:#666}
+  .adminGrid{display:grid; grid-template-columns:minmax(0,1.35fr) minmax(320px,.9fr); gap:16px; align-items:start}
+  .adminPanel .pbody{padding:14px}
+  .permTable{width:100%; border-collapse:separate; border-spacing:0; font-size:12px}
+  .permTable th,.permTable td{padding:8px 9px; border-bottom:1px solid var(--line-soft); text-align:center}
+  .permTable th:first-child,.permTable td:first-child{text-align:left; width:220px}
+  .permTable .group td{padding-top:14px; color:var(--blue); text-transform:uppercase; letter-spacing:.16em; font-size:10px; background:rgba(0,155,219,.05)}
+  .permCheck{width:18px; height:18px; accent-color:var(--blue)}
+  .adminConfig{display:grid; gap:12px}
+  .adminConfig .field input{width:100%}
+  .miniLabel{display:block; color:var(--muted-2); font-size:10px; text-transform:uppercase; letter-spacing:.14em; margin:0 0 7px}
+  .chipGrid{display:flex; flex-wrap:wrap; gap:8px}
+  .pickChip{display:inline-flex; align-items:center; gap:7px; border:1px solid var(--line-soft); background:var(--bg-0); border-radius:10px; padding:8px 10px; color:var(--text); font-size:12px}
+  .pickChip input{accent-color:var(--blue)}
+  .zoneList{max-height:380px; overflow:auto; border:1px solid var(--line-soft); border-radius:12px; background:var(--bg-0)}
+  .zoneRow{display:grid; grid-template-columns:22px minmax(0,1fr) 70px; gap:10px; align-items:center; padding:9px 11px; border-bottom:1px solid var(--line-soft)}
+  .zoneRow:last-child{border-bottom:0}
+  .zoneRow .zn{font-weight:800; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .zoneRow .zm{font-size:11px; color:var(--muted); margin-top:2px}
+  .zoneRow input{accent-color:var(--blue)}
+  .zoneMplus{display:flex; justify-content:flex-end; align-items:center; gap:5px; font-size:10px; color:var(--muted)}
+  .adminNote{font-size:12px; color:var(--muted); line-height:1.5}
   @media(max-width:720px){ .wclKpis{grid-template-columns:1fr 1fr} .wclControls select{max-width:100%} }
+  @media(max-width:1180px){ .adminGrid{grid-template-columns:1fr} }
   @media(max-width:1180px){ .singleGrid{grid-template-columns:1fr 1fr} .singleGrid>.singleStack:first-child{grid-column:1/-1} }
   @media(max-width:720px){ .singleTop,.singleGrid{grid-template-columns:1fr} .singleHero{align-items:flex-start; flex-direction:column} .singleHeroStats{justify-content:flex-start} .singleHeroStats .mini{text-align:left} }
   @media(max-width:1100px){
@@ -651,16 +673,50 @@ function tierSummaryHtml(t){
 }
 function tierScore(t){ let sc=0; TIER_SLOTS.forEach(s=>{ const c=t.slots[s]; if(c) sc+=TIER_LETTER_WEIGHT[c.letter]||0; }); return sc; }
 
-/* capacidades por rol */
-const CAP = {
-  basico:  { viewAudit:false, addSale:false, editAny:false, editOwn:false, delSale:false, manageWeek:false, editSlots:false, setPaid:false, manageUsers:false, manageRecruits:false },
-  cargador:{ viewAudit:false, addSale:true,  editAny:false, editOwn:true,  delSale:false, manageWeek:false, editSlots:false, setPaid:false, manageUsers:false, manageRecruits:false },
-  officer: { viewAudit:true,  addSale:true,  editAny:true,  editOwn:true,  delSale:true,  manageWeek:true,  editSlots:true,  setPaid:true,  manageUsers:false, manageRecruits:true },
-  admin:   { viewAudit:true,  addSale:true,  editAny:true,  editOwn:true,  delSale:true,  manageWeek:true,  editSlots:true,  setPaid:true,  manageUsers:true,  manageRecruits:true }
+/* capacidades por rol: defaults locales, editables desde Admin cuando SQL 020 este aplicado */
+const DEFAULT_CAP = {
+  basico:  { viewSemana:true, viewCalendario:true, viewProgreso:false, viewResumen:false, viewRoster:false, viewPersonaje:false, viewAuditoria:false, viewReclutas:false, viewUsuarios:false, viewAdmin:false, addSale:false, editAny:false, editOwn:false, delSale:false, manageWeek:false, editSlots:false, setPaid:false, manageRoster:false, manageUsers:false, manageRecruits:false, manageAbilities:false, syncExternal:false, manageAdmin:false },
+  cargador:{ viewSemana:true, viewCalendario:true, viewProgreso:false, viewResumen:false, viewRoster:false, viewPersonaje:false, viewAuditoria:false, viewReclutas:false, viewUsuarios:false, viewAdmin:false, addSale:true,  editAny:false, editOwn:true,  delSale:false, manageWeek:false, editSlots:false, setPaid:false, manageRoster:false, manageUsers:false, manageRecruits:false, manageAbilities:false, syncExternal:false, manageAdmin:false },
+  officer: { viewSemana:true, viewCalendario:true, viewProgreso:true,  viewResumen:true,  viewRoster:true,  viewPersonaje:true,  viewAuditoria:true,  viewReclutas:true,  viewUsuarios:false, viewAdmin:false, addSale:true,  editAny:true,  editOwn:true,  delSale:true,  manageWeek:true,  editSlots:true,  setPaid:true,  manageRoster:false, manageUsers:false, manageRecruits:true,  manageAbilities:false, syncExternal:true,  manageAdmin:false },
+  admin:   { viewSemana:true, viewCalendario:true, viewProgreso:true,  viewResumen:true,  viewRoster:true,  viewPersonaje:true,  viewAuditoria:true,  viewReclutas:true,  viewUsuarios:true,  viewAdmin:true,  addSale:true,  editAny:true,  editOwn:true,  delSale:true,  manageWeek:true,  editSlots:true,  setPaid:true,  manageRoster:true,  manageUsers:true,  manageRecruits:true,  manageAbilities:true,  syncExternal:true,  manageAdmin:true }
 };
+const ROLE_KEYS = Object.keys(ROLE_LABEL);
+const TAB_DEFS = [
+  ['semana','Semana','viewSemana'],
+  ['calendario','Calendario','viewCalendario'],
+  ['progreso','Progreso','viewProgreso'],
+  ['resumen','Resumen','viewResumen'],
+  ['roster','Roster','viewRoster'],
+  ['personaje','Personaje','viewPersonaje'],
+  ['auditoria','Auditoría','viewAuditoria'],
+  ['reclutas','Reclutas','viewReclutas'],
+  ['usuarios','Usuarios','viewUsuarios'],
+  ['admin','Admin','viewAdmin']
+];
+const PERMISSION_GROUPS = [
+  ['Solapas', TAB_DEFS.map(([id,label,cap])=>[cap,label])],
+  ['Ventas', [['addSale','Cargar venta'],['editOwn','Editar propias'],['editAny','Editar todas'],['delSale','Borrar ventas'],['setPaid','Marcar pagado']]],
+  ['Gestión', [['manageWeek','Semanas/cupos'],['editSlots','Editar cupos'],['manageRoster','Roster/personajes'],['manageRecruits','Reclutas'],['manageUsers','Usuarios'],['manageAbilities','Habilidades'],['syncExternal','Sync manual'],['manageAdmin','Panel Admin']]]
+];
+const DEFAULT_WCL_ZONE_IDS = [46,47,50];
+const DEFAULT_WCL_DIFFS = [5,4,3,2];
+const DEFAULT_WCL_METRICS = ['dps','hps','playerspeed','bossdps'];
+const DEFAULT_WCL_MPLUS_ZONE_ID = 47;
+function normalizePerms(value){
+  const src=(value&&typeof value==='object'&&!Array.isArray(value))?value:{};
+  const out={};
+  ROLE_KEYS.forEach(r=>{
+    out[r]={...DEFAULT_CAP[r]};
+    const incoming=(src[r]&&typeof src[r]==='object'&&!Array.isArray(src[r]))?src[r]:{};
+    Object.keys(DEFAULT_CAP.admin).forEach(k=>{ if(k in incoming) out[r][k]=incoming[k]===true; });
+  });
+  out.admin.viewUsuarios=true; out.admin.viewAdmin=true; out.admin.manageUsers=true; out.admin.manageAdmin=true;
+  return out;
+}
+function rolePerms(){ return normalizePerms(settings.role_permissions); }
 
 let state={ weeks:[], current:null };
-let users=[], settings={ require_login:false }, auditLog=[];
+let users=[], settings={ require_login:false, role_permissions:null, wcl_active_zone_ids:DEFAULT_WCL_ZONE_IDS, wcl_mplus_zone_id:DEFAULT_WCL_MPLUS_ZONE_ID, wcl_active_difficulties:DEFAULT_WCL_DIFFS, wcl_active_metrics:DEFAULT_WCL_METRICS, raiderio_season:'current' }, auditLog=[];
 let characters=[], characterProgress=[], realms=[], trackedAbilities=[], wclRankings=[], wclZones=[], raiderProfiles=[];
 let recruits=[], recruitFilter={q:"",status:"open"}, recruitLoadError='', recruitPanelOpenId=''; let selectedRecruitId="";
 let progView='general', progSearch='', progClass='all', progRole='all', progSort={col:'ilvl',dir:-1};
@@ -670,7 +726,7 @@ let view='semana', editingId=null, lastSig="", creating=false, forceLogin=false;
 let audFilter={ raid:'all', status:'all', q:'', period:'all', from:'', to:'' };
 
 const role = ()=> session ? session.role : 'basico';
-const cap = (k)=> CAP[role()][k];
+const cap = (k)=> !!(rolePerms()[role()]&&rolePerms()[role()][k]);
 function canEditSale(s){ if(cap('editAny')) return true; if(cap('editOwn') && session && s.created_by===session.username && s.status!=='pagado') return true; return false; }
 const me = ()=> session ? session.username : 'invitado';
 function isActorAdmin(username){ const u=users.find(x=>x.username===username); return !!(u && u.role==='admin'); }
@@ -709,6 +765,7 @@ async function fetchRecruits(){
 }
 /* Dispara sync-characters con una sesión Officer/Admin validada en el servidor. */
 async function manualSync(btn){
+  if(!cap('syncExternal')) return toast('No tenés permiso para sincronizar APIs');
   const orig=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.textContent='Sincronizando…'; }
   try{
     const r=await fetch(SUPABASE_URL+'/functions/v1/sync-characters',{ method:'POST', headers:edgeHeaders(true), body:JSON.stringify({source:'manual'}) });
@@ -722,8 +779,9 @@ async function manualSync(btn){
   finally{ if(btn){ btn.disabled=false; btn.textContent=orig||'↻ Refrescar API'; } }
 }
 async function manualWclSync(ch,btn){
+  if(!cap('syncExternal')) return toast('No tenés permiso para sincronizar WCL');
   const orig=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.textContent='Actualizando WCL…'; }
-  const zoneId=Number(singleWclZone||46), difficulty=zoneId===47?0:Number(singleWclDifficulty||5), metric=singleWclMetric||'dps';
+  const zoneId=Number(singleWclZone||wclActiveZoneIds()[0]||46), difficulty=zoneId===wclMplusZoneId()?0:Number(singleWclDifficulty||5), metric=singleWclMetric||'dps';
   try{
     const r=await fetch(SUPABASE_URL+'/functions/v1/sync-warcraftlogs',{ method:'POST', headers:edgeHeaders(true), body:JSON.stringify({ scope:'character', characterId:ch.id, zoneIds:[zoneId], difficulties:[difficulty], metrics:[metric] }) });
     const j=await r.json().catch(()=>({}));
@@ -737,6 +795,7 @@ async function manualWclSync(ch,btn){
   finally{ if(btn){ btn.disabled=false; btn.textContent=orig||'↻ WCL'; } }
 }
 async function manualRaiderSync(ch,btn){
+  if(!cap('syncExternal')) return toast('No tenés permiso para sincronizar Raider.IO');
   const orig=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.textContent='Actualizando…'; }
   try{
     const r=await fetch(SUPABASE_URL+'/functions/v1/sync-raiderio',{ method:'POST', headers:edgeHeaders(true), body:JSON.stringify({ characterId:ch.id }) });
@@ -777,13 +836,23 @@ async function fetchAll(){
   const weeks=data.weeks||[], sales=data.sales||[], us=data.users||[], st=data.settings||[], al=data.audit||[];
   weeks.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.created_at||'').localeCompare(b.created_at||''));
   weeks.forEach(w=>{ w.slots=w.slots||blankSlots(); w.sales=sales.filter(s=>s.week_id===w.id); });
-  state.weeks=weeks; users=us||[]; settings=Object.assign({require_login:false,show_admin_activity:false,auto_sync:true},(st&&st[0])||{}); auditLog=(al||[]).sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
+  state.weeks=weeks; users=us||[]; settings=Object.assign({
+    require_login:false,
+    show_admin_activity:false,
+    auto_sync:true,
+    role_permissions:null,
+    wcl_active_zone_ids:DEFAULT_WCL_ZONE_IDS,
+    wcl_mplus_zone_id:DEFAULT_WCL_MPLUS_ZONE_ID,
+    wcl_active_difficulties:DEFAULT_WCL_DIFFS,
+    wcl_active_metrics:DEFAULT_WCL_METRICS,
+    raiderio_season:'current'
+  },(st&&st[0])||{}); auditLog=(al||[]).sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
   if(!state.current||!state.weeks.find(w=>w.id===state.current)) state.current=state.weeks.length?state.weeks[state.weeks.length-1].id:null;
   characters=data.characters||[]; characterProgress=data.progress||[]; realms=data.realms||[]; trackedAbilities=data.abilities||[];
   wclZones=data.zones||[]; wclRankings=data.rankings||[]; raiderProfiles=data.rio||[];
   if(cap('manageRecruits')){ try{ await fetchRecruits(); }catch(e){ recruits=[]; recruitLoadError=e&&e.message?e.message:String(e); } }
 }
-function dataSig(){ return JSON.stringify([state.weeks.map(w=>[w.id,w.label,w.date,w.slots,w.sales]), users.map(u=>[u.username,u.role]), settings.require_login, auditLog.length, characterProgress.map(c=>[c.character_id,c.updated_at,c.synced_ok]), trackedAbilities.map(a=>[a.id,a.spell_id,a.name,a.class,a.group_name,a.role_filter,a.enabled]), wclRankings.map(r=>[r.character_id,r.zone_id,r.metric,r.difficulty,r.updated_at]), raiderProfiles.map(r=>[r.character_id,r.updated_at,r.synced_ok]), recruits.map(r=>[r.id,r.status,r.updated_at])]); }
+function dataSig(){ return JSON.stringify([state.weeks.map(w=>[w.id,w.label,w.date,w.slots,w.sales]), users.map(u=>[u.username,u.role]), settings.require_login, settings.show_admin_activity, settings.auto_sync, settings.role_permissions, settings.wcl_active_zone_ids, settings.wcl_active_difficulties, settings.wcl_active_metrics, settings.raiderio_season, auditLog.length, characterProgress.map(c=>[c.character_id,c.updated_at,c.synced_ok]), trackedAbilities.map(a=>[a.id,a.spell_id,a.name,a.class,a.group_name,a.role_filter,a.enabled]), wclRankings.map(r=>[r.character_id,r.zone_id,r.metric,r.difficulty,r.updated_at]), raiderProfiles.map(r=>[r.character_id,r.updated_at,r.synced_ok]), recruits.map(r=>[r.id,r.status,r.updated_at])]); }
 async function refresh(toastOnChange){
   if(!session||!session.token) return;
   try{ await fetchAll(); clearError(); setLive('ok','en vivo');
@@ -833,7 +902,7 @@ function gate(){
 }
 
 /* ============================================================ RENDER ============================================================ */
-function visibleTabs(){ const t=[['semana','Semana'],['calendario','Calendario']]; if(cap('viewAudit')){ t.push(['progreso','Progreso'],['resumen','Resumen'],['roster','Roster'],['personaje','Personaje'],['auditoria','Auditoría']); } if(cap('manageRecruits')) t.push(['reclutas','Reclutas']); if(cap('manageUsers')) t.push(['usuarios','Usuarios']); return t; }
+function visibleTabs(){ return TAB_DEFS.filter(([,label,perm])=>cap(perm)).map(([id,label])=>[id,label]); }
 
 /* ---------- calculo: Great Vault, encantamientos, gemas ---------- */
 function vaultMplusSlots(bestRuns){ const n=(bestRuns||[]).length; if(n>=8) return 3; if(n>=4) return 2; if(n>=1) return 1; return 0; }
@@ -930,13 +999,14 @@ function render(){
   else if(view==='auditoria') renderAuditoria();
   else if(view==='reclutas') renderReclutas();
   else if(view==='usuarios') renderUsuarios();
+  else if(view==='admin') renderAdmin();
 }
 
 /* ---------- PROGRESO (equipo / M+ / raid, vía Battle.net) ---------- */
 const PROG_VIEWS = [['general','General'],['gear','Equipo por slot'],['tier','Piezas de tier'],['enchants','Encantamientos'],['gems','Gemas'],['stats','Distribución de stats'],['vault','Bóveda']];
 function renderProgreso(){
   const c=document.getElementById('content');
-  const isAdmin=cap('manageUsers');
+  const isAdmin=cap('manageRoster');
   if(!characters.length){
     c.innerHTML='<div class="empty" style="padding:60px"><b>Sin datos todavía</b>Corré la sincronización (supabase/functions/sync-characters) para traer equipo, Mythic+ y progreso de raid desde Battle.net.'
       +(isAdmin?' O agregá el primer personaje del roster con el botón de abajo.':'')+'</div>';
@@ -944,7 +1014,7 @@ function renderProgreso(){
     return;
   }
   const usedClasses=[...new Set(characters.filter(ch=>ch.class).map(ch=>ch.class))].sort();
-  c.innerHTML=`<div class="wbar"><div class="sectitle" style="margin:0">Progreso del roster</div><div class="actions"><button class="btn ghost sm" id="progSync" title="Traer los datos más recientes desde Battle.net ahora">↻ Refrescar API</button>${isAdmin?'<button class="btn primary" id="newChar">+ Personaje</button>':''}</div></div>
+  c.innerHTML=`<div class="wbar"><div class="sectitle" style="margin:0">Progreso del roster</div><div class="actions">${cap('syncExternal')?'<button class="btn ghost sm" id="progSync" title="Traer los datos más recientes desde Battle.net ahora">↻ Refrescar API</button>':''}${isAdmin?'<button class="btn primary" id="newChar">+ Personaje</button>':''}</div></div>
     <div class="audbar">
       <select id="prog_view">${PROG_VIEWS.map(([v,l])=>`<option value="${v}" ${progView===v?'selected':''}>${l}</option>`).join('')}</select>
       <input type="text" id="prog_search" placeholder="Buscar por nombre, clase o rol…" value="${esc(progSearch)}" autocomplete="off">
@@ -955,7 +1025,7 @@ function renderProgreso(){
     </div>
     <div id="prog_table"></div>`;
   if(isAdmin) document.getElementById('newChar').onclick=openNewChar;
-  document.getElementById('progSync').onclick=(e)=>manualSync(e.currentTarget);
+  if(cap('syncExternal')) document.getElementById('progSync').onclick=(e)=>manualSync(e.currentTarget);
   const vsel=document.getElementById('prog_view'); vsel.onchange=()=>{ progView=vsel.value; renderProgTable(); };
   const search=document.getElementById('prog_search'); search.oninput=()=>{ progSearch=search.value; renderProgTable(); };
   const csel=document.getElementById('prog_class'); csel.onchange=()=>{ progClass=csel.value; renderProgTable(); };
@@ -963,7 +1033,7 @@ function renderProgreso(){
   renderProgTable();
 }
 function progFilteredRows(){
-  const isAdmin=cap('manageUsers');
+  const isAdmin=cap('manageRoster');
   const q=progSearch.trim().toLowerCase();
   return characters.filter(ch=>(!ch.is_recruit_shadow) && (isAdmin||ch.active!==false))
     .filter(ch=> progClass==='all' || ch.class===progClass)
@@ -975,7 +1045,7 @@ function sortRows(rows, valueFn){ const d=progSort.dir; return [...rows].sort((a
 function nameCell(r){ return `<td class="classcell" style="--cc:${CLASS_COLOR[r.ch.class]||''}"><span class="classrow">${classBadge(r.ch.class)}<b style="color:var(--cc)">${esc(r.ch.name)}</b></span></td>`; }
 function renderProgTable(){
   const wrap=document.getElementById('prog_table'); if(!wrap) return;
-  const isAdmin=cap('manageUsers');
+  const isAdmin=cap('manageRoster');
   let rows=progFilteredRows();
   const cnt=document.getElementById('prog_count'); if(cnt) cnt.textContent=rows.length+' de '+characters.filter(ch=>isAdmin||ch.active!==false).length;
   if(!rows.length){ wrap.innerHTML='<div class="empty" style="padding:40px">Ningún personaje coincide con el filtro.</div>'; return; }
@@ -1373,7 +1443,7 @@ function compactExternalError(msg){
 }
 function singleRaiderPanel(ch){
   const row=rioCharacterProfile(ch);
-  const syncBtn=`<button class="btn ghost sm" id="rioSync">↻ Raider.IO</button>`;
+  const syncBtn=cap('syncExternal')?`<button class="btn ghost sm" id="rioSync">↻ Raider.IO</button>`:'';
   if(!row){
     return `<div class="panel singlePanel"><div class="phead rioHead"><h2><span class="dia"></span>Raider.IO</h2>${syncBtn}</div><div class="pbody"><div class="singleEmpty">Sin datos Raider.IO sincronizados para ${esc(ch.name)}. Corré el SQL 015, deployá <code>sync-raiderio</code> y tocá ↻ Raider.IO.</div></div></div>`;
   }
@@ -1491,23 +1561,28 @@ const WCL_FALLBACK_ZONES = [
   { id:47, name:"Mythic+ Season 1", expansion_id:7, expansion_name:"Midnight" },
   { id:50, name:"Sporefall", expansion_id:7, expansion_name:"Midnight" },
 ];
-const WCL_ACTIVE_ZONE_IDS = new Set(WCL_FALLBACK_ZONES.map(z=>String(z.id)));
-const WCL_ACTIVE_ZONE_ORDER = new Map(WCL_FALLBACK_ZONES.map((z,i)=>[String(z.id),i]));
 const WCL_METRIC_LABEL = { dps:"Damage", hps:"Healing", playerspeed:"Speed", bossdps:"Damage To Bosses" };
 const WCL_AMOUNT_LABEL = { dps:"Highest DPS", hps:"Highest HPS", playerspeed:"Best Speed", bossdps:"Boss DPS" };
 const WCL_DIFF_LABEL = { 5:"Mythic", 4:"Heroic", 3:"Normal", 2:"LFR", 1:"LFR" };
+function numberArraySetting(value,fallback){ const raw=Array.isArray(value)?value:(value==null?[]:[value]); const out=[...new Set(raw.map(Number).filter(n=>Number.isInteger(n)&&n>0))]; return out.length?out:[...fallback]; }
+function textArraySetting(value,fallback,allowed){ const raw=Array.isArray(value)?value:(value==null?[]:[value]); const set=allowed?new Set(allowed):null; const out=[...new Set(raw.map(x=>String(x).trim()).filter(x=>x&&(!set||set.has(x))))]; return out.length?out:[...fallback]; }
+function wclActiveZoneIds(){ return numberArraySetting(settings.wcl_active_zone_ids,DEFAULT_WCL_ZONE_IDS); }
+function wclMplusZoneId(){ const ids=wclActiveZoneIds(); const v=Number(settings.wcl_mplus_zone_id); return ids.includes(v)?v:DEFAULT_WCL_MPLUS_ZONE_ID; }
+function wclActiveDiffs(){ return numberArraySetting(settings.wcl_active_difficulties,DEFAULT_WCL_DIFFS).filter(d=>WCL_DIFF_LABEL[d]); }
+function wclActiveMetrics(){ return textArraySetting(settings.wcl_active_metrics,DEFAULT_WCL_METRICS,Object.keys(WCL_METRIC_LABEL)); }
 function wclZoneOptions(){
+  const ids=wclActiveZoneIds(), activeIds=new Set(ids.map(String)), order=new Map(ids.map((id,i)=>[String(id),i]));
   const byId=new Map(WCL_FALLBACK_ZONES.map(z=>[String(z.id),z]));
-  (wclZones||[]).forEach(z=>{ if(WCL_ACTIVE_ZONE_IDS.has(String(z.id))) byId.set(String(z.id),z); });
-  return [...byId.values()].sort((a,b)=>(WCL_ACTIVE_ZONE_ORDER.get(String(a.id))??99)-(WCL_ACTIVE_ZONE_ORDER.get(String(b.id))??99));
+  (wclZones||[]).forEach(z=>{ if(activeIds.has(String(z.id))) byId.set(String(z.id),z); });
+  return [...byId.values()].filter(z=>activeIds.has(String(z.id))).sort((a,b)=>(order.get(String(a.id))??99)-(order.get(String(b.id))??99));
 }
 function wclCharacterRows(ch){ return (wclRankings||[]).filter(r=>String(r.character_id)===String(ch.id)); }
 function wclSelectedRow(ch){
   const rows=wclCharacterRows(ch);
   if(!rows.length) return null;
   const byFresh=(a,b)=>Number(wclHasRankings(b))-Number(wclHasRankings(a)) || new Date(b.updated_at||0)-new Date(a.updated_at||0);
-  if(String(singleWclZone)==='47'){
-    const mplus=rows.filter(r=>String(r.zone_id)==='47' && String(r.metric||'dps')===String(singleWclMetric));
+  if(Number(singleWclZone)===wclMplusZoneId()){
+    const mplus=rows.filter(r=>Number(r.zone_id)===wclMplusZoneId() && String(r.metric||'dps')===String(singleWclMetric));
     return mplus.find(r=>String(r.difficulty)==='0') || mplus.sort(byFresh)[0] || null;
   }
   return rows.filter(r=>String(r.zone_id)===String(singleWclZone) && String(r.metric||'dps')===String(singleWclMetric) && String(r.difficulty||5)===String(singleWclDifficulty)).sort(byFresh)[0] || null;
@@ -1544,7 +1619,7 @@ function wclDuration(ms){ ms=Number(ms); if(!Number.isFinite(ms)||ms<=0) return 
 function wclRankingsArray(row){ const r=row&&row.rankings; if(Array.isArray(r)) return r; if(r&&Array.isArray(r.rankings)) return r.rankings; if(r&&Array.isArray(r.data)) return r.data; return []; }
 function wclAllStar(row){ const a=row&&row.all_stars; if(Array.isArray(a)) return a[0]||{}; if(a&&Array.isArray(a.data)) return a.data[0]||{}; return a||{}; }
 function wclHasRankings(row){ return wclRankingsArray(row).length>0; }
-function wclIsMplus(row){ return String((row&&row.zone_id)||singleWclZone)==='47'; }
+function wclIsMplus(row){ return Number((row&&row.zone_id)||singleWclZone)===wclMplusZoneId(); }
 function wclMplusPoints(r){
   const vals=[r.points,r.score,r.bestRank&&r.bestRank.score,r.allStars&&r.allStars.points];
   const found=vals.find(v=>Number.isFinite(Number(v)));
@@ -1559,12 +1634,14 @@ function singleWclPanel(ch){
   const row=wclSelectedRow(ch), zones=wclZoneOptions();
   if(row){ singleWclZone=String(row.zone_id||singleWclZone||50); singleWclMetric=String(row.metric||singleWclMetric||'dps'); singleWclDifficulty=String(row.difficulty||singleWclDifficulty||5); }
   const selectedZone=zones.find(z=>String(z.id)===String(singleWclZone)) || (row?{id:row.zone_id,name:row.zone_name,expansion_name:row.expansion_name}:zones[0]);
-  const isMplusSelected=String((row&&row.zone_id)||singleWclZone)==='47';
+  const isMplusSelected=Number((row&&row.zone_id)||singleWclZone)===wclMplusZoneId();
   const zoneOpts=zones.map(z=>`<option value="${esc(z.id)}" ${String(z.id)===String(singleWclZone)?'selected':''}>${esc(z.name)}</option>`).join('');
-  const metricOpts=Object.entries(WCL_METRIC_LABEL).map(([k,v])=>`<option value="${k}" ${k===singleWclMetric?'selected':''}>${esc(v)}</option>`).join('');
-  const diffOpts=Object.entries(WCL_DIFF_LABEL).map(([k,v])=>`<option value="${k}" ${String(k)===String(singleWclDifficulty)?'selected':''}>${esc(v)}</option>`).join('');
+  const metrics=wclActiveMetrics(); if(!metrics.includes(singleWclMetric)) singleWclMetric=metrics[0]||'dps';
+  const diffs=wclActiveDiffs(); if(!diffs.map(String).includes(String(singleWclDifficulty))) singleWclDifficulty=String(diffs[0]||5);
+  const metricOpts=metrics.map(k=>`<option value="${k}" ${k===singleWclMetric?'selected':''}>${esc(WCL_METRIC_LABEL[k]||k)}</option>`).join('');
+  const diffOpts=diffs.map(k=>`<option value="${k}" ${String(k)===String(singleWclDifficulty)?'selected':''}>${esc(WCL_DIFF_LABEL[k]||k)}</option>`).join('');
   const diffControl=isMplusSelected ? '' : `<select id="wclDifficulty">${diffOpts}</select>`;
-  const controls=`<div class="wclControls"><select id="wclZone">${zoneOpts}</select><select id="wclMetric">${metricOpts}</select>${diffControl}<button class="btn ghost sm" id="wclSync">↻ WCL</button></div>`;
+  const controls=`<div class="wclControls"><select id="wclZone">${zoneOpts}</select><select id="wclMetric">${metricOpts}</select>${diffControl}${cap('syncExternal')?'<button class="btn ghost sm" id="wclSync">↻ WCL</button>':''}</div>`;
   if(!row){
     return `<div class="panel wclPanel"><div class="wclHead"><h2>Warcraft Logs</h2>${controls}</div><div class="pbody"><div class="singleEmpty">Sin datos WCL sincronizados para ${esc(ch.name)}. Cuando esté deployada <code>sync-warcraftlogs</code>, el botón ↻ WCL va a poblar esta vista.</div></div></div>`;
   }
@@ -1760,7 +1837,7 @@ function recruitDetailHtml(app){
     <div class="recruitActions">
       <select id="recruitStatusSelect">${Object.entries(RECRUIT_STATUS_LABEL).map(([k,v])=>`<option value="${k}" ${app.status===k?'selected':''}>${esc(v)}</option>`).join('')}</select>
       <button class="btn ghost sm" id="recruitRefreshArmory">↻ Armory</button>
-      <button class="btn primary sm" id="recruitAddRoster">${ch&&ch.active!==false?'Ya está en roster':(ch?'Reactivar en roster':'Agregar al roster')}</button>
+      <button class="btn primary sm" id="recruitAddRoster">${ch&&ch.active!==false?'Ya está en roster':'Agregar al roster'}</button>
       <button class="btn ghost sm" id="recruitOpenPanel" ${ch?'':'disabled'}>${panelOpen?'Ocultar Panel de Personaje':'Abrir Panel de Personaje'}</button>
       <button class="btn ghost sm danger" id="recruitDelete">Borrar</button>
     </div>
@@ -2192,25 +2269,118 @@ async function delTrackedAbility(idv){
   try{ await sbDel('tracked_abilities',idv); logAction('borrar_habilidad','tracked_ability',idv,{target:a.name}); await refresh(); toast('Habilidad borrada'); }
   catch(e){ toast('No se pudo borrar'); }
 }
+function adminCriticalPerm(roleKey,capKey){ return roleKey==='admin' && ['viewUsuarios','viewAdmin','manageUsers','manageAdmin'].includes(capKey); }
+function permissionTableHtml(){
+  const perms=rolePerms();
+  const head=`<thead><tr><th>Permiso</th>${ROLE_KEYS.map(r=>`<th>${esc(ROLE_LABEL[r])}</th>`).join('')}</tr></thead>`;
+  const body=PERMISSION_GROUPS.map(([group,items])=>{
+    const rows=items.map(([capKey,label])=>`<tr><td>${esc(label)}</td>${ROLE_KEYS.map(r=>{
+      const locked=adminCriticalPerm(r,capKey);
+      return `<td><input class="permCheck adminPerm" type="checkbox" data-role="${r}" data-cap="${capKey}" ${perms[r]&&perms[r][capKey]?'checked':''} ${locked?'checked disabled title="El Admin no puede perder este permiso crítico"':''}></td>`;
+    }).join('')}</tr>`).join('');
+    return `<tr class="group"><td colspan="${ROLE_KEYS.length+1}">${esc(group)}</td></tr>${rows}`;
+  }).join('');
+  return `<div class="tablewrap" style="margin:0"><table class="permTable">${head}<tbody>${body}</tbody></table></div>`;
+}
+function allKnownWclZones(){
+  const byId=new Map(WCL_FALLBACK_ZONES.map(z=>[String(z.id),z]));
+  (wclZones||[]).forEach(z=>byId.set(String(z.id),z));
+  const active=wclActiveZoneIds(), order=new Map(active.map((id,i)=>[String(id),i]));
+  return [...byId.values()].sort((a,b)=>{
+    const ao=order.has(String(a.id))?0:1, bo=order.has(String(b.id))?0:1;
+    if(ao!==bo) return ao-bo;
+    const oi=(order.get(String(a.id))??999)-(order.get(String(b.id))??999); if(oi) return oi;
+    return String(a.expansion_name||'').localeCompare(String(b.expansion_name||'')) || String(a.name||'').localeCompare(String(b.name||''));
+  });
+}
+function adminZoneRowsHtml(){
+  const active=new Set(wclActiveZoneIds().map(String)), mplus=String(wclMplusZoneId());
+  return allKnownWclZones().map(z=>`<label class="zoneRow">
+    <input class="adminZone" type="checkbox" value="${Number(z.id)}" ${active.has(String(z.id))?'checked':''}>
+    <span><span class="zn">${esc(z.name||('Zone '+z.id))}</span><div class="zm">${esc(z.expansion_name||'Sin expansión')} · ID ${esc(z.id)}${z.frozen?' · frozen':''}</div></span>
+    <span class="zoneMplus"><input class="adminMplus" type="radio" name="adminMplus" value="${Number(z.id)}" ${String(z.id)===mplus?'checked':''}> M+</span>
+  </label>`).join('');
+}
+function renderAdmin(){
+  const c=document.getElementById('content');
+  if(!cap('viewAdmin')){ c.innerHTML='<div class="empty" style="padding:60px"><b>Sin permiso</b>Tu usuario no puede abrir el panel Admin.</div>'; return; }
+  const diffChips=Object.entries(WCL_DIFF_LABEL).filter(([k])=>DEFAULT_WCL_DIFFS.includes(Number(k))).map(([k,label])=>`<label class="pickChip"><input class="adminDiff" type="checkbox" value="${k}" ${wclActiveDiffs().map(String).includes(String(k))?'checked':''}>${esc(label)}</label>`).join('');
+  const metricChips=Object.entries(WCL_METRIC_LABEL).map(([k,label])=>`<label class="pickChip"><input class="adminMetric" type="checkbox" value="${k}" ${wclActiveMetrics().includes(k)?'checked':''}>${esc(label)}</label>`).join('');
+  c.innerHTML=`<div class="wbar"><div class="sectitle" style="margin:0">Panel Admin</div><div class="actions"><button class="btn ghost sm" id="adminDetectWcl">Detectar zonas WCL</button></div></div>
+    <div class="adminGrid">
+      <div class="panel adminPanel"><div class="phead"><h2><span class="dia"></span>Permisos por rango</h2></div><div class="pbody">
+        <p class="adminNote">Estos permisos controlan solapas visibles y acciones principales. El servidor usa la misma matriz para aceptar o rechazar escrituras.</p>
+        ${permissionTableHtml()}
+        <div class="actions" style="margin-top:12px"><button class="btn primary" id="adminSavePerms">Guardar permisos</button></div>
+      </div></div>
+      <div class="panel adminPanel"><div class="phead"><h2><span class="dia"></span>Parche / APIs</h2></div><div class="pbody adminConfig">
+        <div class="field"><label>Raider.IO season</label><input id="adminRioSeason" value="${esc(settings.raiderio_season||'current')}" placeholder="current o season-mn-1"></div>
+        <div><label class="miniLabel">Dificultades WCL</label><div class="chipGrid">${diffChips}</div></div>
+        <div><label class="miniLabel">Métricas WCL</label><div class="chipGrid">${metricChips}</div></div>
+        <div><label class="miniLabel">Zonas WCL activas</label><div class="zoneList">${adminZoneRowsHtml()}</div></div>
+        <p class="adminNote">Raider.IO queda en <code>current</code> salvo que fuerces otra season. WCL detecta zonas, pero vos elegís cuáles se usan para evitar beta, contenido viejo o zonas todavía no publicadas.</p>
+        <div class="actions"><button class="btn primary" id="adminSaveApis">Guardar configuración</button></div>
+      </div></div>
+    </div>`;
+  document.getElementById('adminSavePerms').onclick=saveAdminPermissions;
+  document.getElementById('adminSaveApis').onclick=saveAdminApiConfig;
+  document.getElementById('adminDetectWcl').onclick=detectWclZones;
+}
+async function saveAdminPermissions(){
+  if(!cap('manageAdmin')) return toast('No tenés permiso para cambiar Admin');
+  const perms=normalizePerms({});
+  document.querySelectorAll('.adminPerm').forEach(cb=>{
+    const roleKey=cb.dataset.role, capKey=cb.dataset.cap;
+    if(perms[roleKey]&&capKey) perms[roleKey][capKey]=cb.checked;
+  });
+  perms.admin.viewUsuarios=true; perms.admin.viewAdmin=true; perms.admin.manageUsers=true; perms.admin.manageAdmin=true;
+  try{ await sbUpd('app_settings',1,{role_permissions:perms}); settings.role_permissions=perms; logAction('cambiar_permisos','settings','1',{target:'role_permissions'}); await refresh(true); toast('Permisos guardados'); }
+  catch(e){ toast('No se pudieron guardar permisos. ¿Corriste SQL 020?'); }
+}
+async function saveAdminApiConfig(){
+  if(!cap('manageAdmin')) return toast('No tenés permiso para cambiar APIs');
+  const zoneIds=[...document.querySelectorAll('.adminZone:checked')].map(x=>Number(x.value)).filter(Boolean);
+  if(!zoneIds.length) return toast('Elegí al menos una zona WCL');
+  let mplus=Number((document.querySelector('.adminMplus:checked')||{}).value||zoneIds[0]);
+  if(!zoneIds.includes(mplus)) mplus=zoneIds[0];
+  const difficulties=[...document.querySelectorAll('.adminDiff:checked')].map(x=>Number(x.value)).filter(Boolean);
+  if(!difficulties.length) return toast('Elegí al menos una dificultad');
+  const metrics=[...document.querySelectorAll('.adminMetric:checked')].map(x=>x.value).filter(x=>WCL_METRIC_LABEL[x]);
+  if(!metrics.length) return toast('Elegí al menos una métrica');
+  const season=(document.getElementById('adminRioSeason').value||'current').trim()||'current';
+  const patch={wcl_active_zone_ids:zoneIds,wcl_mplus_zone_id:mplus,wcl_active_difficulties:difficulties,wcl_active_metrics:metrics,raiderio_season:season};
+  try{ await sbUpd('app_settings',1,patch); Object.assign(settings,patch); logAction('cambiar_api_config','settings','1',patch); await refresh(true); toast('Configuración guardada'); }
+  catch(e){ toast('No se pudo guardar. ¿Corriste SQL 020?'); }
+}
+async function detectWclZones(btn){
+  btn=btn||document.getElementById('adminDetectWcl');
+  const orig=btn.textContent; btn.disabled=true; btn.textContent='Detectando…';
+  try{ await edgeRequest('sync-warcraftlogs',{action:'sync_zones'},true); await refresh(true); if(view==='admin') renderAdmin(); toast('Zonas WCL detectadas'); }
+  catch(e){ toast('No se pudo consultar WCL'); }
+  finally{ btn.disabled=false; btn.textContent=orig; }
+}
 function renderUsuarios(){
   const c=document.getElementById('content');
+  if(!cap('manageUsers')){ c.innerHTML='<div class="empty" style="padding:60px"><b>Sin permiso</b>Tu usuario no puede administrar usuarios.</div>'; return; }
   const rows=users.map(u=>`<tr><td><b>${esc(u.username)}</b></td>
     <td><select data-uid="${u.id}" class="rolesel" ${u.username===session.username?'disabled':''}>${Object.keys(ROLE_LABEL).map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${ROLE_LABEL[r]}</option>`).join('')}</select></td>
     <td class="mono" style="color:var(--muted-2)">${u.created_at?fmtDate(u.created_at):''}</td>
     <td style="text-align:right">${u.username===session.username?'<span class="mono" style="color:var(--muted-2)">vos</span>':`<button class="btn ghost sm" data-pwid="${u.id}">Reset pass</button> <button class="btn ghost sm danger" data-delid="${u.id}">Borrar</button>`}</td></tr>`).join('');
   c.innerHTML=`<div class="wbar"><div></div><div class="actions"><button class="btn primary" id="newUser">+ Usuario</button></div></div>
     <div class="tablewrap"><table class="utable"><thead><tr><th>Usuario</th><th>Rol</th><th>Creado</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="sectitle">Acceso a la página</div>
+    ${cap('manageAdmin')?`<div class="sectitle">Acceso a la página</div>
     <div class="toggle"><div class="lab"><b>Inicio de sesión obligatorio</b><span>La página operativa es privada. Las sesiones vencen y los permisos se validan en el servidor.</span></div><div class="sw on" title="Obligatorio por seguridad"></div></div>
     <div class="toggle"><div class="lab"><b>Mostrar actividad de admins a todos</b><span>Por defecto, las acciones hechas por un Admin solo las ven otros Admin en la Auditoría. Activá esto si querés que los Officers también vean la actividad de los admins.</span></div><div class="sw ${settings.show_admin_activity?'on':''}" id="swAdminAct"></div></div>
-    <div class="toggle"><div class="lab"><b>Auto-sincronizar fuentes externas</b><span>Cuando está activo, Armory, Warcraft Logs y Raider.IO se actualizan con los cron horarios protegidos.</span></div><div class="sw ${settings.auto_sync?'on':''}" id="swAutoSync"></div></div>
+    <div class="toggle"><div class="lab"><b>Auto-sincronizar fuentes externas</b><span>Cuando está activo, Armory, Warcraft Logs y Raider.IO se actualizan con los cron horarios protegidos.</span></div><div class="sw ${settings.auto_sync?'on':''}" id="swAutoSync"></div></div>`:''}
     <p class="hint" style="margin-top:14px">Las contraseñas se verifican en el servidor, las sesiones vencen a las 12 horas y el navegador no recibe hashes ni claves privadas.</p>
-    ${abilityConfigHtml()}`;
+    ${cap('manageAbilities')?abilityConfigHtml():''}`;
   document.getElementById('newUser').onclick=openNewUser;
-  document.getElementById('swAdminAct').onclick=async()=>{ const nv=!settings.show_admin_activity; try{ await sbUpd('app_settings',1,{show_admin_activity:nv}); settings.show_admin_activity=nv; logAction('cambiar_acceso','settings','1',{target:nv?'actividad admin visible a todos':'actividad admin solo admins'}); renderUsuarios(); toast('Visibilidad actualizada'); }catch(e){ toast('No se pudo (¿falta la columna show_admin_activity?)'); } };
-  document.getElementById('swAutoSync').onclick=async()=>{ const nv=!settings.auto_sync; try{ await sbUpd('app_settings',1,{auto_sync:nv}); settings.auto_sync=nv; logAction('cambiar_acceso','settings','1',{target:nv?'auto-sync activado':'auto-sync apagado'}); renderUsuarios(); toast(nv?'Auto-sync activado (cada 5 min)':'Auto-sync apagado'); }catch(e){ toast('No se pudo (¿corriste el SQL 008?)'); } };
-  document.getElementById('ab_lookup').onclick=()=>lookupAbilitySpell(document.getElementById('ab_lookup'));
-  document.getElementById('ab_add').onclick=addTrackedAbility;
+  const swAdminAct=document.getElementById('swAdminAct');
+  if(swAdminAct) swAdminAct.onclick=async()=>{ const nv=!settings.show_admin_activity; try{ await sbUpd('app_settings',1,{show_admin_activity:nv}); settings.show_admin_activity=nv; logAction('cambiar_acceso','settings','1',{target:nv?'actividad admin visible a todos':'actividad admin solo admins'}); renderUsuarios(); toast('Visibilidad actualizada'); }catch(e){ toast('No se pudo (¿falta la columna show_admin_activity?)'); } };
+  const swAutoSync=document.getElementById('swAutoSync');
+  if(swAutoSync) swAutoSync.onclick=async()=>{ const nv=!settings.auto_sync; try{ await sbUpd('app_settings',1,{auto_sync:nv}); settings.auto_sync=nv; logAction('cambiar_acceso','settings','1',{target:nv?'auto-sync activado':'auto-sync apagado'}); renderUsuarios(); toast(nv?'Auto-sync activado (cada 5 min)':'Auto-sync apagado'); }catch(e){ toast('No se pudo (¿corriste el SQL 008?)'); } };
+  const abLookup=document.getElementById('ab_lookup'); if(abLookup) abLookup.onclick=()=>lookupAbilitySpell(abLookup);
+  const abAdd=document.getElementById('ab_add'); if(abAdd) abAdd.onclick=addTrackedAbility;
   document.querySelectorAll('[data-editabil]').forEach(b=> b.onclick=()=>openEditAbility(b.dataset.editabil));
   document.querySelectorAll('[data-delabil]').forEach(b=> b.onclick=()=>delTrackedAbility(b.dataset.delabil));
   document.querySelectorAll('.rolesel').forEach(sel=> sel.onchange=async()=>{ const u=users.find(x=>x.id===sel.dataset.uid); try{ await authRequest('update_role',{user_id:u.id,role:sel.value}); logAction('cambiar_rol','user',u.id,{target:u.username+' → '+ROLE_LABEL[sel.value]}); await refresh(); toast('Rol actualizado'); }catch(e){ toast(e.message||'No se pudo'); } });
