@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-PKYIL6WmUflorfs7GXOBzkL6cKXwUwdwvbbYsaJ3Zk4='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-9PvzHlTMAbVv6kRVGxHAhBIbYnSSl8AU5MN5vwY7v5w='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co http://localhost:3000 http://127.0.0.1:3000">
 <title>PROTOTYPE · Recruitment</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Inter:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap');
@@ -160,9 +160,20 @@
 
 <script>
 /* Identificador y clave publicable del backend. No otorgan acceso privilegiado;
-   Blizzard, WCL y service_role viven exclusivamente en Edge Function secrets. */
+   Blizzard, WCL y service_role viven exclusivamente en Edge Functions o en C:\Secrets. */
 const SUPABASE_URL = "https://hjatxlvqytgkizcaopce.supabase.co";
 const SUPABASE_KEY = "sb_publishable_s_msjQFbOa5B0SQVF0TE4w_5F4aKk0M";
+const LOCAL_API_URL = "http://localhost:3000";
+function resolveApiBaseUrl(){
+  const qs=new URLSearchParams(location.search);
+  const fromQuery=qs.get("api");
+  if(fromQuery){ localStorage.setItem("pt_api_base",fromQuery); return fromQuery.replace(/\/+$/,""); }
+  const stored=localStorage.getItem("pt_api_base");
+  if(stored) return stored.replace(/\/+$/,"");
+  if(location.protocol==="file:" || location.hostname==="localhost" || location.hostname==="127.0.0.1") return LOCAL_API_URL;
+  return SUPABASE_URL;
+}
+const API_BASE_URL = resolveApiBaseUrl();
 const H = () => ({ apikey: SUPABASE_KEY, "Content-Type": "application/json" });
 
 let confirmedCharacter = null;
@@ -180,7 +191,7 @@ function errText(e){
 function currentRealm(){ const opt=document.getElementById("realm").selectedOptions[0]; return { slug:opt?.value||"", name:opt?.dataset.name||opt?.textContent||"", region:opt?.dataset.region||"us" }; }
 
 async function recruitApi(body){
-  const res=await fetch(SUPABASE_URL + "/functions/v1/recruit-lookup", { method:"POST", headers:H(), body:JSON.stringify(body||{}) });
+  const res=await fetch(API_BASE_URL + "/functions/v1/recruit-lookup", { method:"POST", headers:H(), body:JSON.stringify(body||{}) });
   const data=await res.json().catch(()=>({}));
   if(!res.ok) throw new Error(errText(data.error||data)||("HTTP "+res.status));
   return data;

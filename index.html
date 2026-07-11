@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-jNY7ZqZsa43fWB9YMnOUo27c6VtamALXuCn8cLmt9BU='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-A4SwZpB8zUy1Lw8hNRqmgo+oSzbm3namblDUQoKLnKQ='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co http://localhost:3000 http://127.0.0.1:3000">
 <title>PROTOTYPE · Registro de Carries</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap');
@@ -476,6 +476,11 @@
   .permCheck{width:18px; height:18px; accent-color:var(--blue)}
   .adminConfig{display:grid; gap:12px}
   .adminConfig .field input{width:100%}
+  .adminConfig .field select{width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--text); font-family:var(--font-body); font-weight:800}
+  .adminFieldGrid{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px}
+  .adminFieldGrid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .backendBox{display:grid; grid-template-columns:minmax(150px,.45fr) minmax(0,1fr) auto; gap:8px; align-items:end}
+  .backendCurrent{font-family:var(--font-mono); color:var(--muted); font-size:10.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:8px 0}
   .miniLabel{display:block; color:var(--muted-2); font-size:10px; text-transform:uppercase; letter-spacing:.14em; margin:0 0 7px}
   .chipGrid{display:flex; flex-wrap:wrap; gap:8px}
   .pickChip{display:inline-flex; align-items:center; gap:7px; border:1px solid var(--line-soft); background:var(--bg-0); border-radius:10px; padding:8px 10px; color:var(--text); font-size:12px}
@@ -488,7 +493,7 @@
   .zoneRow input{accent-color:var(--blue)}
   .zoneMplus{display:flex; justify-content:flex-end; align-items:center; gap:5px; font-size:10px; color:var(--muted)}
   .adminNote{font-size:12px; color:var(--muted); line-height:1.5}
-  @media(max-width:720px){ .wclKpis{grid-template-columns:1fr 1fr} .wclControls select{max-width:100%} }
+  @media(max-width:720px){ .wclKpis{grid-template-columns:1fr 1fr} .wclControls select{max-width:100%} .adminFieldGrid,.adminFieldGrid.two,.backendBox{grid-template-columns:1fr} }
   @media(max-width:1180px){ .adminGrid{grid-template-columns:1fr} }
   @media(max-width:1180px){ .singleGrid{grid-template-columns:1fr 1fr} .singleGrid>.singleStack:first-child{grid-column:1/-1} }
   @media(max-width:720px){ .singleTop,.singleGrid{grid-template-columns:1fr} .singleHero{align-items:flex-start; flex-direction:column} .singleHeroStats{justify-content:flex-start} .singleHeroStats .mini{text-align:left} }
@@ -602,10 +607,22 @@
 /* ============================================================
    CONFIGURACIÓN
    ============================================================ */
-/* Estos dos valores identifican el backend público y son visibles por diseño en cualquier web.
-   No son credenciales privilegiadas. Los secretos reales viven solo en Supabase Edge Functions. */
+/* Estos valores identifican backends públicos/locales y son visibles por diseño.
+   No son credenciales privilegiadas. Los secretos reales viven solo en Edge Functions o en C:\Secrets. */
 const SUPABASE_URL = "https://hjatxlvqytgkizcaopce.supabase.co";
 const SUPABASE_KEY = "sb_publishable_s_msjQFbOa5B0SQVF0TE4w_5F4aKk0M";
+const LOCAL_API_URL = "http://localhost:3000";
+const API_OVERRIDE_KEY = 'pt_api_base';
+function resolveApiBaseUrl(){
+  const qs=new URLSearchParams(location.search);
+  const fromQuery=qs.get('api');
+  if(fromQuery){ localStorage.setItem(API_OVERRIDE_KEY,fromQuery); return fromQuery.replace(/\/+$/,''); }
+  const stored=localStorage.getItem(API_OVERRIDE_KEY);
+  if(stored) return stored.replace(/\/+$/,'');
+  if(location.protocol==='file:' || location.hostname==='localhost' || location.hostname==='127.0.0.1') return LOCAL_API_URL;
+  return SUPABASE_URL;
+}
+const API_BASE_URL = resolveApiBaseUrl();
 /* ============================================================ */
 
 const RAIDS = {
@@ -702,6 +719,17 @@ const DEFAULT_WCL_ZONE_IDS = [46,47,50];
 const DEFAULT_WCL_DIFFS = [5,4,3,2];
 const DEFAULT_WCL_METRICS = ['dps','hps','playerspeed','bossdps'];
 const DEFAULT_WCL_MPLUS_ZONE_ID = 47;
+const DEFAULT_SYNC_SETTINGS = {
+  armory_refresh_minutes:60,
+  armory_batch_size:5,
+  armory_batch_every_minutes:2,
+  raiderio_refresh_minutes:60,
+  raiderio_batch_size:5,
+  raiderio_batch_every_minutes:2,
+  wcl_refresh_minutes:120,
+  wcl_batch_size:2,
+  wcl_batch_every_minutes:5
+};
 function normalizePerms(value){
   const src=(value&&typeof value==='object'&&!Array.isArray(value))?value:{};
   const out={};
@@ -716,7 +744,7 @@ function normalizePerms(value){
 function rolePerms(){ return normalizePerms(settings.role_permissions); }
 
 let state={ weeks:[], current:null };
-let users=[], settings={ require_login:false, role_permissions:null, wcl_active_zone_ids:DEFAULT_WCL_ZONE_IDS, wcl_mplus_zone_id:DEFAULT_WCL_MPLUS_ZONE_ID, wcl_active_difficulties:DEFAULT_WCL_DIFFS, wcl_active_metrics:DEFAULT_WCL_METRICS, raiderio_season:'current' }, auditLog=[];
+let users=[], settings={ require_login:false, role_permissions:null, wcl_active_zone_ids:DEFAULT_WCL_ZONE_IDS, wcl_mplus_zone_id:DEFAULT_WCL_MPLUS_ZONE_ID, wcl_active_difficulties:DEFAULT_WCL_DIFFS, wcl_active_metrics:DEFAULT_WCL_METRICS, raiderio_season:'current', ...DEFAULT_SYNC_SETTINGS }, auditLog=[];
 let characters=[], characterProgress=[], realms=[], trackedAbilities=[], wclRankings=[], wclZones=[], raiderProfiles=[];
 let recruits=[], recruitFilter={q:"",status:"open"}, recruitLoadError='', recruitPanelOpenId=''; let selectedRecruitId="";
 let progView='general', progSearch='', progClass='all', progRole='all', progSort={col:'ilvl',dir:-1};
@@ -731,15 +759,15 @@ function canEditSale(s){ if(cap('editAny')) return true; if(cap('editOwn') && se
 const me = ()=> session ? session.username : 'invitado';
 function isActorAdmin(username){ const u=users.find(x=>x.username===username); return !!(u && u.role==='admin'); }
 
-/* ---------- Supabase Edge gateway ---------- */
-const configured = ()=> !SUPABASE_URL.includes('TU-PROYECTO') && !SUPABASE_KEY.includes('TU-');
+/* ---------- API gateway ---------- */
+const configured = ()=> !API_BASE_URL.includes('TU-PROYECTO') && !SUPABASE_KEY.includes('TU-');
 const edgeHeaders = (withSession=false)=>{
   const headers={ apikey:SUPABASE_KEY, 'Content-Type':'application/json' };
   if(withSession && session&&session.token) headers['x-pt-token']=session.token;
   return headers;
 };
 async function edgeRequest(fn,body,withSession=true){
-  const r=await fetch(SUPABASE_URL+'/functions/v1/'+fn,{ method:'POST', headers:edgeHeaders(withSession), body:JSON.stringify(body||{}) });
+  const r=await fetch(API_BASE_URL+'/functions/v1/'+fn,{ method:'POST', headers:edgeHeaders(withSession), body:JSON.stringify(body||{}) });
   const j=await r.json().catch(()=>({}));
   if(!r.ok) { const e=new Error(j.error||j.message||j.msg||('HTTP '+r.status)); e.status=r.status; throw e; }
   return j;
@@ -751,7 +779,7 @@ const sbUpd=(table,id,patch)=>appRequest('mutate',{table,method:'update',id,patc
 const sbDel=(table,id)=>appRequest('mutate',{table,method:'delete',id});
 async function recruitAdmin(method, payload, qs=''){
   const headers=edgeHeaders(true);
-  const r=await fetch(SUPABASE_URL+'/functions/v1/recruit-admin'+qs,{ method, headers, body:payload?JSON.stringify(payload):undefined });
+  const r=await fetch(API_BASE_URL+'/functions/v1/recruit-admin'+qs,{ method, headers, body:payload?JSON.stringify(payload):undefined });
   const j=await r.json().catch(()=>({}));
   if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
   return j;
@@ -768,7 +796,7 @@ async function manualSync(btn){
   if(!cap('syncExternal')) return toast('No tenés permiso para sincronizar APIs');
   const orig=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.textContent='Sincronizando…'; }
   try{
-    const r=await fetch(SUPABASE_URL+'/functions/v1/sync-characters',{ method:'POST', headers:edgeHeaders(true), body:JSON.stringify({source:'manual'}) });
+    const r=await fetch(API_BASE_URL+'/functions/v1/sync-characters',{ method:'POST', headers:edgeHeaders(true), body:JSON.stringify({source:'manual'}) });
     const j=await r.json().catch(()=>({}));
     if(j.skipped==='too_soon') toast('Los datos ya estaban frescos (hace <1 min)');
     else if(j.synced!=null) toast('Actualizado: '+j.synced+' personajes'+(j.failed&&j.failed.length?' · '+j.failed.length+' con error':''));
@@ -783,7 +811,7 @@ async function manualWclSync(ch,btn){
   const orig=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.textContent='Actualizando WCL…'; }
   const zoneId=Number(singleWclZone||wclActiveZoneIds()[0]||46), difficulty=zoneId===wclMplusZoneId()?0:Number(singleWclDifficulty||5), metric=singleWclMetric||'dps';
   try{
-    const r=await fetch(SUPABASE_URL+'/functions/v1/sync-warcraftlogs',{ method:'POST', headers:edgeHeaders(true), body:JSON.stringify({ scope:'character', characterId:ch.id, zoneIds:[zoneId], difficulties:[difficulty], metrics:[metric] }) });
+    const r=await fetch(API_BASE_URL+'/functions/v1/sync-warcraftlogs',{ method:'POST', headers:edgeHeaders(true), body:JSON.stringify({ scope:'character', characterId:ch.id, zoneIds:[zoneId], difficulties:[difficulty], metrics:[metric] }) });
     const j=await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(j.error||j.message||('HTTP '+r.status));
     const failed=(j.failed||[]).length;
@@ -798,14 +826,14 @@ async function manualRaiderSync(ch,btn){
   if(!cap('syncExternal')) return toast('No tenés permiso para sincronizar Raider.IO');
   const orig=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.textContent='Actualizando…'; }
   try{
-    const r=await fetch(SUPABASE_URL+'/functions/v1/sync-raiderio',{ method:'POST', headers:edgeHeaders(true), body:JSON.stringify({ characterId:ch.id }) });
+    const r=await fetch(API_BASE_URL+'/functions/v1/sync-raiderio',{ method:'POST', headers:edgeHeaders(true), body:JSON.stringify({ characterId:ch.id }) });
     const j=await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
-    toast(j.synced ? 'Raider.IO actualizado' : 'Raider.IO sin cambios');
+    toast(j.synced ? 'M+ Score actualizado' : 'M+ Score sin cambios');
     logAction('sync_raiderio','character',ch.id,{target:ch.name,synced:j.synced,failed:(j.failed||[]).length});
     await refresh(true);
-  }catch(e){ toast('Raider.IO todavía no está conectado'); }
-  finally{ if(btn){ btn.disabled=false; btn.textContent=orig||'↻ Raider.IO'; } }
+  }catch(e){ toast('M+ Score todavía no está conectado'); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=orig||'↻ M+ Score'; } }
 }
 
 /* ---------- util ---------- */
@@ -830,9 +858,27 @@ function clearError(){ document.getElementById('banner').classList.remove('on');
 let toastT; function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),1900); }
 
 /* ---------- fetch ---------- */
+function snapshotCharacterIds(){
+  const ids=new Set();
+  if(view==='personaje'){
+    const rows=singleRows();
+    const ch=singleSelectedChar(rows);
+    if(ch&&ch.id) ids.add(ch.id);
+  }
+  if(view==='reclutas' && recruitPanelOpenId){
+    const app=(recruits||[]).find(r=>r.id===recruitPanelOpenId);
+    const ch=app&&recruitRosterMatch(app);
+    if(ch&&ch.id) ids.add(ch.id);
+  }
+  return [...ids].slice(0,5);
+}
+function snapshotPayload(){
+  const character_ids=snapshotCharacterIds();
+  return { view, character_ids, include_external:character_ids.length>0 && (view==='personaje'||view==='reclutas') };
+}
 async function fetchAll(){
   if(!session||!session.token) throw new Error('Sesión requerida');
-  const data=await appRequest('snapshot');
+  const data=await appRequest('snapshot',snapshotPayload());
   const weeks=data.weeks||[], sales=data.sales||[], us=data.users||[], st=data.settings||[], al=data.audit||[];
   weeks.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.created_at||'').localeCompare(b.created_at||''));
   weeks.forEach(w=>{ w.slots=w.slots||blankSlots(); w.sales=sales.filter(s=>s.week_id===w.id); });
@@ -845,14 +891,21 @@ async function fetchAll(){
     wcl_mplus_zone_id:DEFAULT_WCL_MPLUS_ZONE_ID,
     wcl_active_difficulties:DEFAULT_WCL_DIFFS,
     wcl_active_metrics:DEFAULT_WCL_METRICS,
-    raiderio_season:'current'
-  },(st&&st[0])||{}); auditLog=(al||[]).sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
+    raiderio_season:'current',
+    ...DEFAULT_SYNC_SETTINGS
+  },(st&&st[0])||{});
+  if('audit' in data) auditLog=(al||[]).sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
   if(!state.current||!state.weeks.find(w=>w.id===state.current)) state.current=state.weeks.length?state.weeks[state.weeks.length-1].id:null;
-  characters=data.characters||[]; characterProgress=data.progress||[]; realms=data.realms||[]; trackedAbilities=data.abilities||[];
-  wclZones=data.zones||[]; wclRankings=data.rankings||[]; raiderProfiles=data.rio||[];
+  if('characters' in data) characters=data.characters||[];
+  if('progress' in data) characterProgress=data.progress||[];
+  if('realms' in data) realms=data.realms||[];
+  if('abilities' in data) trackedAbilities=data.abilities||[];
+  if('zones' in data) wclZones=data.zones||[];
+  if('rankings' in data) wclRankings=data.rankings||[];
+  if('rio' in data) raiderProfiles=data.rio||[];
   if(cap('manageRecruits')){ try{ await fetchRecruits(); }catch(e){ recruits=[]; recruitLoadError=e&&e.message?e.message:String(e); } }
 }
-function dataSig(){ return JSON.stringify([state.weeks.map(w=>[w.id,w.label,w.date,w.slots,w.sales]), users.map(u=>[u.username,u.role]), settings.require_login, settings.show_admin_activity, settings.auto_sync, settings.role_permissions, settings.wcl_active_zone_ids, settings.wcl_active_difficulties, settings.wcl_active_metrics, settings.raiderio_season, auditLog.length, characterProgress.map(c=>[c.character_id,c.updated_at,c.synced_ok]), trackedAbilities.map(a=>[a.id,a.spell_id,a.name,a.class,a.group_name,a.role_filter,a.enabled]), wclRankings.map(r=>[r.character_id,r.zone_id,r.metric,r.difficulty,r.updated_at]), raiderProfiles.map(r=>[r.character_id,r.updated_at,r.synced_ok]), recruits.map(r=>[r.id,r.status,r.updated_at])]); }
+function dataSig(){ return JSON.stringify([state.weeks.map(w=>[w.id,w.label,w.date,w.slots,w.sales]), users.map(u=>[u.username,u.role]), settings.require_login, settings.show_admin_activity, settings.auto_sync, settings.role_permissions, settings.wcl_active_zone_ids, settings.wcl_active_difficulties, settings.wcl_active_metrics, settings.raiderio_season, Object.keys(DEFAULT_SYNC_SETTINGS).map(k=>settings[k]), auditLog.length, characterProgress.map(c=>[c.character_id,c.updated_at,c.synced_ok]), trackedAbilities.map(a=>[a.id,a.spell_id,a.name,a.class,a.group_name,a.role_filter,a.enabled]), wclRankings.map(r=>[r.character_id,r.zone_id,r.metric,r.difficulty,r.updated_at]), raiderProfiles.map(r=>[r.character_id,r.updated_at,r.synced_ok]), recruits.map(r=>[r.id,r.status,r.updated_at])]); }
 async function refresh(toastOnChange){
   if(!session||!session.token) return;
   try{ await fetchAll(); clearError(); setLive('ok','en vivo');
@@ -985,7 +1038,7 @@ function renderTabs(){
   const tabs=document.getElementById('tabs'); const vis=visibleTabs();
   if(!vis.find(t=>t[0]===view)) view=vis[0][0];
   tabs.innerHTML=vis.map(([v,l])=>`<div class="tab ${v===view?'on':''}" data-view="${v}"><span class="dia"></span>${l}</div>`).join('');
-  tabs.querySelectorAll('.tab').forEach(t=> t.onclick=()=>{ view=t.dataset.view; render(); });
+  tabs.querySelectorAll('.tab').forEach(t=> t.onclick=()=>{ view=t.dataset.view; render(); refresh(false); });
 }
 function render(){
   renderUserArea(); renderTabs();
@@ -1008,7 +1061,7 @@ function renderProgreso(){
   const c=document.getElementById('content');
   const isAdmin=cap('manageRoster');
   if(!characters.length){
-    c.innerHTML='<div class="empty" style="padding:60px"><b>Sin datos todavía</b>Corré la sincronización (supabase/functions/sync-characters) para traer equipo, Mythic+ y progreso de raid desde Battle.net.'
+    c.innerHTML='<div class="empty" style="padding:60px"><b>Sin datos todavía</b>Corré la sincronización de Armory para traer equipo, Mythic+ y progreso de raid desde Battle.net.'
       +(isAdmin?' O agregá el primer personaje del roster con el botón de abajo.':'')+'</div>';
     if(isAdmin){ c.innerHTML+=`<div class="actions" style="margin-top:10px"><button class="btn primary" id="newChar">+ Personaje</button></div>`; document.getElementById('newChar').onclick=openNewChar; }
     return;
@@ -1205,7 +1258,7 @@ function singleLinkUrls(ch){
 function kvRow(k,v){ return `<div class="destrow"><span>${esc(k)}</span><span class="g">${v==null||v===''?'—':esc(v)}</span></div>`; }
 function singleInfoPanel(ch,p){
   const realm=realmLabel(ch.region,ch.realm_slug)||((ch.region||'us').toUpperCase()+'-'+(ch.realm_slug||''));
-  return `<div class="panel singlePanel"><div class="phead"><h2><span class="dia"></span>Info rapida</h2></div><div class="pbody singleKV">
+  return `<div class="panel singlePanel"><div class="phead"><h2><span class="dia"></span>Info rápida</h2></div><div class="pbody singleKV">
     ${kvRow('Clase',ch.class||'—')}${kvRow('Rol',CHAR_ROLE_LABEL[ch.role]||ch.role||'—')}${kvRow('Realm',realm)}
     ${kvRow('Raza',p.race||localizedName(p.profile&&p.profile.race))}${kvRow('Genero',p.gender||localizedName(p.profile&&p.profile.gender))}${kvRow('Faccion',p.faction||localizedName(p.profile&&p.profile.faction))}
     ${kvRow('Nivel',p.level)}${kvRow('Rank','Main')}${kvRow('Logros',p.achievement_points)}${kvRow('Monturas',p.mounts_count)}${kvRow('Pets',p.pets_count)}${kvRow('Exaltadas',p.exalted_reputations_count)}
@@ -1220,12 +1273,12 @@ function singleProfessionsPanel(p){
 function singleGearPanel(p){
   const bySlot=gearBySlot(p.gear);
   const rows=GEAR_SLOT_ORDER.map(([slot,label])=>{ const it=bySlot[slot], nm=itemName(it), href=itemHref(it), ilvl=itemIlvl(it); const item=nm ? (href?`<a href="${href}" target="_blank" rel="noopener">${esc(nm)}</a>`:esc(nm)) : '<span style="color:var(--muted-2)">—</span>'; return `<tr><td class="slot">${esc(label)}</td><td class="ilvl">${ilvl||'—'}</td><td class="item">${item}</td></tr>`; }).join('');
-  return `<div class="panel singlePanel"><div class="phead"><h2><span class="dia"></span>Equipo equipado</h2></div><div class="pbody"><table class="singleGear"><thead><tr><th>Slot</th><th>iLvl</th><th>Nombre</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  return `<div class="panel singlePanel"><div class="phead"><h2><span class="dia"></span>Equipo</h2></div><div class="pbody"><table class="singleGear"><thead><tr><th>Slot</th><th>iLvl</th><th>Nombre</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 function singleEnchantPanel(p){
   const bySlot=gearBySlot(p.gear);
   const rows=ENCHANTABLE_SLOTS.map(slot=>{ const it=bySlot[slot], ench=enchantName(it), label=(GEAR_SLOT_ORDER.find(x=>x[0]===slot)||[slot,slot])[1]; return `<tr><td class="slot">${esc(label)}</td><td>${it?(ench?'<span class="singleCheck">✓</span>':'<span style="color:var(--warn)">Falta</span>'):'<span style="color:var(--muted-2)">—</span>'}</td><td>${ench?esc(ench):'<span style="color:var(--muted-2)">—</span>'}</td></tr>`; }).join('');
-  return `<div class="panel singlePanel"><div class="phead"><h2><span class="dia"></span>Encantamientos</h2></div><div class="pbody"><table class="singleGear"><thead><tr><th>Slot</th><th></th><th>Enchant</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  return `<div class="panel singlePanel"><div class="phead"><h2><span class="dia"></span>Mejoras de Equipo</h2></div><div class="pbody"><table class="singleGear"><thead><tr><th>Slot</th><th></th><th>Enchant</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 function rioCharacterProfile(ch){ return (raiderProfiles||[]).find(r=>String(r.character_id)===String(ch.id)); }
 function rioProfileJson(row){ return row&&row.profile&&typeof row.profile==='object' ? row.profile : {}; }
@@ -1443,16 +1496,16 @@ function compactExternalError(msg){
 }
 function singleRaiderPanel(ch){
   const row=rioCharacterProfile(ch);
-  const syncBtn=cap('syncExternal')?`<button class="btn ghost sm" id="rioSync">↻ Raider.IO</button>`:'';
+  const syncBtn=cap('syncExternal')?`<button class="btn ghost sm" id="rioSync">↻ M+ Score</button>`:'';
   if(!row){
-    return `<div class="panel singlePanel"><div class="phead rioHead"><h2><span class="dia"></span>Raider.IO</h2>${syncBtn}</div><div class="pbody"><div class="singleEmpty">Sin datos Raider.IO sincronizados para ${esc(ch.name)}. Corré el SQL 015, deployá <code>sync-raiderio</code> y tocá ↻ Raider.IO.</div></div></div>`;
+    return `<div class="panel singlePanel"><div class="phead rioHead"><h2><span class="dia"></span>M+ Score</h2>${syncBtn}</div><div class="pbody"><div class="singleEmpty">Sin datos de M+ Score sincronizados para ${esc(ch.name)}. Corré el SQL 015, deployá <code>sync-raiderio</code> y tocá ↻ M+ Score.</div></div></div>`;
   }
   if(row.synced_ok===false){
-    return `<div class="panel singlePanel"><div class="phead rioHead"><h2><span class="dia"></span>Raider.IO</h2>${syncBtn}</div><div class="pbody"><div class="singleEmpty">Raider.IO no devolvió datos: ${esc(compactExternalError(row.last_error))}</div></div></div>`;
+    return `<div class="panel singlePanel"><div class="phead rioHead"><h2><span class="dia"></span>M+ Score</h2>${syncBtn}</div><div class="pbody"><div class="singleEmpty">Raider.IO no devolvió datos: ${esc(compactExternalError(row.last_error))}</div></div></div>`;
   }
   const groups=rioSpecGroups(row);
   if(!groups.length){
-    return `<div class="panel singlePanel"><div class="phead rioHead"><h2><span class="dia"></span>Raider.IO</h2>${syncBtn}</div><div class="pbody"><div class="singleEmpty">Sin runs Mythic+ por spec en Raider.IO para este personaje.</div></div></div>`;
+    return `<div class="panel singlePanel"><div class="phead rioHead"><h2><span class="dia"></span>M+ Score</h2>${syncBtn}</div><div class="pbody"><div class="singleEmpty">Sin runs Mythic+ por spec en Raider.IO para este personaje.</div></div></div>`;
   }
   if(!groups.find(g=>g.key===singleRioSpec)) singleRioSpec=groups[0].key;
   const active=groups.find(g=>g.key===singleRioSpec)||groups[0];
@@ -1467,7 +1520,7 @@ function singleRaiderPanel(ch){
     </tr>`;
   }).join('');
   const updated=row.last_crawled_at||row.updated_at;
-  return `<div class="panel singlePanel"><div class="phead rioHead"><h2><span class="dia"></span>Raider.IO</h2>${syncBtn}</div><div class="pbody">
+  return `<div class="panel singlePanel"><div class="phead rioHead"><h2><span class="dia"></span>M+ Score</h2>${syncBtn}</div><div class="pbody">
     <div class="rioTabs">${tabs}</div>
     <table class="singleGear"><thead><tr><th>Dungeon</th><th>Level</th><th>Score</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="rioMeta">${active.mode==='best-dungeons'?'Best per dungeon':'Best runs'} · ${esc(active.label)}${Number.isFinite(active.score)?' · score '+rioFmtScore(active.score):''}${updated?' · actualizado '+esc(fmtDateTime(updated)):''}</div>
@@ -1476,12 +1529,12 @@ function singleRaiderPanel(ch){
 function singleMplusPanel(p){
   const runs=[...(p.mythic_best_runs||[])].sort((a,b)=>(b.score||0)-(a.score||0)||(b.keystone_level||0)-(a.keystone_level||0));
   const rows=runs.length ? runs.map(r=>`<tr><td>${esc(localizedName(r.dungeon)||'—')}</td><td class="ilvl">+${r.keystone_level||0}</td><td class="ilvl">${r.score?Math.round(r.score):'—'}</td></tr>`).join('') : '<tr><td colspan="3" class="singleEmpty">Sin M+ esta semana.</td></tr>';
-  return `<div class="panel singlePanel"><div class="phead"><h2><span class="dia"></span>Mythic+ Dungeons</h2></div><div class="pbody"><table class="singleGear"><thead><tr><th>Mazmorra</th><th>Key</th><th>Rating</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  return `<div class="panel singlePanel"><div class="phead"><h2><span class="dia"></span>M+ Hechas Semana Actual</h2></div><div class="pbody"><table class="singleGear"><thead><tr><th>Mazmorra</th><th>Key</th><th>Rating</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 function singleRaidPanel(p){
   const killed=(p.raid_progress&&p.raid_progress._killed_this_week)||{}, rows=[];
   Object.entries(killed).forEach(([raid,diffs])=>Object.entries(diffs||{}).forEach(([diff,bosses])=>rows.push(`<div class="destrow"><span>${esc(raid)} · ${esc(diff)}</span><span class="g">${(bosses||[]).length}</span></div>`)));
-  return `<div class="panel singlePanel"><div class="phead"><h2><span class="dia"></span>Completado esta semana</h2></div><div class="pbody">${rows.join('')||'<div class="singleEmpty">Sin kills semanales registradas.</div>'}</div></div>`;
+  return `<div class="panel singlePanel"><div class="phead"><h2><span class="dia"></span>Raid Hecha Semana Actual</h2></div><div class="pbody">${rows.join('')||'<div class="singleEmpty">Sin kills semanales registradas.</div>'}</div></div>`;
 }
 function singleLinksPanel(ch){ return `<div class="panel singlePanel"><div class="phead"><h2><span class="dia"></span>Links</h2></div><div class="pbody"><div class="singleLinks">${singleLinkUrls(ch).map(([l,u])=>`<a href="${u}" target="_blank" rel="noopener">${esc(l)}</a>`).join('')}</div></div></div>`; }
 function singleRenownPanel(p){
@@ -1554,7 +1607,7 @@ function singleProgressionPanel(p){
     </div>`;
   }).join('');
   const empty='<div class="singleEmpty">Sin progreso de raid sincronizado desde Armory para este personaje.</div>';
-  return `<div class="panel singlePanel progPanel"><div class="phead"><h2><span class="dia"></span>Progresion del personaje</h2></div><div class="pbody">${hasProgress?sections:empty}</div></div>`;
+  return `<div class="panel singlePanel progPanel"><div class="phead"><h2><span class="dia"></span>Progresión</h2></div><div class="pbody">${hasProgress?sections:empty}</div></div>`;
 }
 const WCL_FALLBACK_ZONES = [
   { id:46, name:"VS / DR / MQD", expansion_id:7, expansion_name:"Midnight" },
@@ -1643,7 +1696,7 @@ function singleWclPanel(ch){
   const diffControl=isMplusSelected ? '' : `<select id="wclDifficulty">${diffOpts}</select>`;
   const controls=`<div class="wclControls"><select id="wclZone">${zoneOpts}</select><select id="wclMetric">${metricOpts}</select>${diffControl}${cap('syncExternal')?'<button class="btn ghost sm" id="wclSync">↻ WCL</button>':''}</div>`;
   if(!row){
-    return `<div class="panel wclPanel"><div class="wclHead"><h2>Warcraft Logs</h2>${controls}</div><div class="pbody"><div class="singleEmpty">Sin datos WCL sincronizados para ${esc(ch.name)}. Cuando esté deployada <code>sync-warcraftlogs</code>, el botón ↻ WCL va a poblar esta vista.</div></div></div>`;
+    return `<div class="panel wclPanel"><div class="wclHead"><h2>Parses - Warcraft Logs</h2>${controls}</div><div class="pbody"><div class="singleEmpty">Sin datos WCL sincronizados para ${esc(ch.name)}. Cuando esté deployada <code>sync-warcraftlogs</code>, el botón ↻ WCL va a poblar esta vista.</div></div></div>`;
   }
   const all=wclAllStar(row), rankings=wclRankingsArray(row);
   const isMplus=wclIsMplus(row);
@@ -1674,7 +1727,7 @@ function singleWclPanel(ch){
   const emptyColspan=isMplus?6:5;
   const emptyText=row.synced_ok===false && row.last_error ? `WCL no devolvió datos: ${esc(compactExternalError(row.last_error))}` : 'Sin rankings para este filtro.';
   return `<div class="panel wclPanel">
-    <div class="wclHead"><h2>Warcraft Logs · ${esc(selectedZone&&selectedZone.expansion_name||row.expansion_name||'Midnight')}</h2>${controls}</div>
+    <div class="wclHead"><h2>Parses - Warcraft Logs</h2>${controls}</div>
     <div class="wclKpis">
       <div class="wclKpi"><span>Best Perf. Avg</span><b class="wclScore ${wclScoreClass(row.best_performance_average)}">${wclPct(row.best_performance_average)}</b></div>
       <div class="wclKpi"><span>Median Perf. Avg</span><b class="wclScore ${wclScoreClass(row.median_performance_average)}">${wclPct(row.median_performance_average)}</b></div>
@@ -1697,9 +1750,9 @@ function renderPersonaje(){
         <div class="singleHeroStats"><div class="mini"><b>${fmtIlvl(p)}</b><span>item level</span></div><div class="mini"><b>${p.mythic_rating?Math.round(p.mythic_rating):'—'}</b><span>M+ rating</span></div><div class="mini"><b>${(p.mythic_best_runs||[]).length}</b><span>esta semana</span></div></div>
       </div>
     </div>
-    <div class="singleGrid"><div class="singleStack">${singleGearPanel(p)}${singleWclPanel(ch)}</div><div class="singleStack">${singleProfessionsPanel(p)}${singleInfoPanel(ch,p)}${singleRenownPanel(p)}${singleProgressionPanel(p)}</div><div class="singleStack">${singleMplusPanel(p)}${singleRaidPanel(p)}${singleLinksPanel(ch)}${singleEnchantPanel(p)}${singleRaiderPanel(ch)}</div></div>
+    <div class="singleGrid"><div class="singleStack">${singleGearPanel(p)}${singleWclPanel(ch)}</div><div class="singleStack">${singleInfoPanel(ch,p)}${singleProfessionsPanel(p)}${singleRenownPanel(p)}${singleProgressionPanel(p)}</div><div class="singleStack">${singleMplusPanel(p)}${singleRaidPanel(p)}${singleLinksPanel(ch)}${singleEnchantPanel(p)}${singleRaiderPanel(ch)}</div></div>
   </div>`;
-  const sel=document.getElementById('singleCharSelect'); if(sel) sel.onchange=()=>{ singleCharId=sel.value; renderPersonaje(); };
+  const sel=document.getElementById('singleCharSelect'); if(sel) sel.onchange=()=>{ singleCharId=sel.value; renderPersonaje(); refresh(false); };
   const wz=document.getElementById('wclZone'); if(wz) wz.onchange=()=>{ singleWclZone=wz.value; renderPersonaje(); };
   const wm=document.getElementById('wclMetric'); if(wm) wm.onchange=()=>{ singleWclMetric=wm.value; renderPersonaje(); };
   const wd=document.getElementById('wclDifficulty'); if(wd) wd.onchange=()=>{ singleWclDifficulty=wd.value; renderPersonaje(); };
@@ -1792,7 +1845,7 @@ function recruitFullCharacter(app,ch){
   const p=characterProgress.find(x=>x.character_id===ch.id)||{};
   return `<div class="recruitFull singleView" style="--cc:${CLASS_COLOR[ch.class]||'var(--blue)'}">
     <div class="sectitle">Panel de personaje ${ch.is_recruit_shadow?'<span class="tag">postulante</span>':(ch.active===false?'<span class="tag">inactivo</span>':'<span class="recruitMatch">ya está en roster</span>')}</div>
-    <div class="singleGrid"><div class="singleStack">${singleGearPanel(p)}${singleWclPanel(ch)}</div><div class="singleStack">${singleProfessionsPanel(p)}${singleInfoPanel(ch,p)}${singleRenownPanel(p)}${singleProgressionPanel(p)}</div><div class="singleStack">${singleMplusPanel(p)}${singleRaidPanel(p)}${singleLinksPanel(ch)}${singleEnchantPanel(p)}${singleRaiderPanel(ch)}</div></div>
+    <div class="singleGrid"><div class="singleStack">${singleGearPanel(p)}${singleWclPanel(ch)}</div><div class="singleStack">${singleInfoPanel(ch,p)}${singleProfessionsPanel(p)}${singleRenownPanel(p)}${singleProgressionPanel(p)}</div><div class="singleStack">${singleMplusPanel(p)}${singleRaidPanel(p)}${singleLinksPanel(ch)}${singleEnchantPanel(p)}${singleRaiderPanel(ch)}</div></div>
   </div>`;
 }
 function renderReclutas(){
@@ -1861,7 +1914,7 @@ function wireRecruitDetail(app){
   const add=document.getElementById('recruitAddRoster');
   if(add) add.onclick=()=>addRecruitToRoster(app,add);
   const open=document.getElementById('recruitOpenPanel');
-  if(open) open.onclick=()=>{ recruitPanelOpenId = recruitPanelOpenId===app.id ? '' : app.id; renderReclutas(); };
+  if(open) open.onclick=()=>{ recruitPanelOpenId = recruitPanelOpenId===app.id ? '' : app.id; renderReclutas(); refresh(false); };
   const arm=document.getElementById('recruitRefreshArmory');
   if(arm) arm.onclick=()=>refreshRecruitArmory(app,arm);
   const wz=document.getElementById('wclZone'); if(wz) wz.onchange=()=>{ singleWclZone=wz.value; renderReclutas(); };
@@ -2301,6 +2354,51 @@ function adminZoneRowsHtml(){
     <span class="zoneMplus"><input class="adminMplus" type="radio" name="adminMplus" value="${Number(z.id)}" ${String(z.id)===mplus?'checked':''}> M+</span>
   </label>`).join('');
 }
+function backendChoice(){
+  const stored=(localStorage.getItem(API_OVERRIDE_KEY)||'').replace(/\/+$/,'');
+  if(!stored) return 'auto';
+  if(stored===LOCAL_API_URL) return 'local';
+  if(stored===SUPABASE_URL) return 'supabase';
+  return 'custom';
+}
+function backendConfigHtml(){
+  const choice=backendChoice(), custom=choice==='custom'?API_BASE_URL:'';
+  return `<div><label class="miniLabel">Backend activo</label>
+    <div class="backendBox">
+      <div class="field"><select id="adminBackendMode">
+        <option value="auto" ${choice==='auto'?'selected':''}>Auto</option>
+        <option value="local" ${choice==='local'?'selected':''}>Local</option>
+        <option value="supabase" ${choice==='supabase'?'selected':''}>Supabase</option>
+        <option value="custom" ${choice==='custom'?'selected':''}>Cloudflare / dominio</option>
+      </select></div>
+      <div class="field"><input id="adminBackendCustom" value="${esc(custom)}" placeholder="https://tu-tunnel.trycloudflare.com o dominio propio"></div>
+      <button class="btn ghost sm" id="adminApplyBackend">Aplicar</button>
+    </div>
+    <div class="backendCurrent">Actual: ${esc(API_BASE_URL)}</div>
+  </div>`;
+}
+function syncNumberField(id,label,value,min=0,max=10080){
+  return `<div class="field"><label>${esc(label)}</label><input id="${esc(id)}" type="number" min="${min}" max="${max}" step="1" value="${Number.isFinite(Number(value))?Number(value):0}"></div>`;
+}
+function syncConfigHtml(){
+  return `<div><label class="miniLabel">Frecuencia y tandas</label>
+    <div class="adminFieldGrid">
+      ${syncNumberField('adminArmoryRefresh','Armory refresh (min)',settings.armory_refresh_minutes??DEFAULT_SYNC_SETTINGS.armory_refresh_minutes,1)}
+      ${syncNumberField('adminRioRefresh','Raider.IO refresh (min)',settings.raiderio_refresh_minutes??DEFAULT_SYNC_SETTINGS.raiderio_refresh_minutes,1)}
+      ${syncNumberField('adminWclRefresh','WCL refresh (min)',settings.wcl_refresh_minutes??DEFAULT_SYNC_SETTINGS.wcl_refresh_minutes,1)}
+    </div>
+    <div class="adminFieldGrid" style="margin-top:10px">
+      ${syncNumberField('adminArmoryBatch','Armory batch size',settings.armory_batch_size??DEFAULT_SYNC_SETTINGS.armory_batch_size,0)}
+      ${syncNumberField('adminRioBatch','Raider.IO batch size',settings.raiderio_batch_size??DEFAULT_SYNC_SETTINGS.raiderio_batch_size,0)}
+      ${syncNumberField('adminWclBatch','WCL batch size',settings.wcl_batch_size??DEFAULT_SYNC_SETTINGS.wcl_batch_size,0)}
+    </div>
+    <div class="adminFieldGrid" style="margin-top:10px">
+      ${syncNumberField('adminArmoryBatchEvery','Armory tanda cada (min)',settings.armory_batch_every_minutes??DEFAULT_SYNC_SETTINGS.armory_batch_every_minutes,0)}
+      ${syncNumberField('adminRioBatchEvery','Raider.IO tanda cada (min)',settings.raiderio_batch_every_minutes??DEFAULT_SYNC_SETTINGS.raiderio_batch_every_minutes,0)}
+      ${syncNumberField('adminWclBatchEvery','WCL tanda cada (min)',settings.wcl_batch_every_minutes??DEFAULT_SYNC_SETTINGS.wcl_batch_every_minutes,0)}
+    </div>
+  </div>`;
+}
 function renderAdmin(){
   const c=document.getElementById('content');
   if(!cap('viewAdmin')){ c.innerHTML='<div class="empty" style="padding:60px"><b>Sin permiso</b>Tu usuario no puede abrir el panel Admin.</div>'; return; }
@@ -2314,7 +2412,9 @@ function renderAdmin(){
         <div class="actions" style="margin-top:12px"><button class="btn primary" id="adminSavePerms">Guardar permisos</button></div>
       </div></div>
       <div class="panel adminPanel"><div class="phead"><h2><span class="dia"></span>Parche / APIs</h2></div><div class="pbody adminConfig">
+        ${backendConfigHtml()}
         <div class="field"><label>Raider.IO season</label><input id="adminRioSeason" value="${esc(settings.raiderio_season||'current')}" placeholder="current o season-mn-1"></div>
+        ${syncConfigHtml()}
         <div><label class="miniLabel">Dificultades WCL</label><div class="chipGrid">${diffChips}</div></div>
         <div><label class="miniLabel">Métricas WCL</label><div class="chipGrid">${metricChips}</div></div>
         <div><label class="miniLabel">Zonas WCL activas</label><div class="zoneList">${adminZoneRowsHtml()}</div></div>
@@ -2325,6 +2425,7 @@ function renderAdmin(){
   document.getElementById('adminSavePerms').onclick=saveAdminPermissions;
   document.getElementById('adminSaveApis').onclick=saveAdminApiConfig;
   document.getElementById('adminDetectWcl').onclick=detectWclZones;
+  document.getElementById('adminApplyBackend').onclick=applyBackendConfig;
 }
 async function saveAdminPermissions(){
   if(!cap('manageAdmin')) return toast('No tenés permiso para cambiar Admin');
@@ -2348,9 +2449,41 @@ async function saveAdminApiConfig(){
   const metrics=[...document.querySelectorAll('.adminMetric:checked')].map(x=>x.value).filter(x=>WCL_METRIC_LABEL[x]);
   if(!metrics.length) return toast('Elegí al menos una métrica');
   const season=(document.getElementById('adminRioSeason').value||'current').trim()||'current';
-  const patch={wcl_active_zone_ids:zoneIds,wcl_mplus_zone_id:mplus,wcl_active_difficulties:difficulties,wcl_active_metrics:metrics,raiderio_season:season};
+  const intVal=(id,fallback,min=0,max=10080)=>{
+    const n=Number(document.getElementById(id).value);
+    if(!Number.isFinite(n)) return fallback;
+    return Math.max(min,Math.min(max,Math.floor(n)));
+  };
+  const patch={
+    wcl_active_zone_ids:zoneIds,
+    wcl_mplus_zone_id:mplus,
+    wcl_active_difficulties:difficulties,
+    wcl_active_metrics:metrics,
+    raiderio_season:season,
+    armory_refresh_minutes:intVal('adminArmoryRefresh',DEFAULT_SYNC_SETTINGS.armory_refresh_minutes,1),
+    armory_batch_size:intVal('adminArmoryBatch',DEFAULT_SYNC_SETTINGS.armory_batch_size,0),
+    armory_batch_every_minutes:intVal('adminArmoryBatchEvery',DEFAULT_SYNC_SETTINGS.armory_batch_every_minutes,0),
+    raiderio_refresh_minutes:intVal('adminRioRefresh',DEFAULT_SYNC_SETTINGS.raiderio_refresh_minutes,1),
+    raiderio_batch_size:intVal('adminRioBatch',DEFAULT_SYNC_SETTINGS.raiderio_batch_size,0),
+    raiderio_batch_every_minutes:intVal('adminRioBatchEvery',DEFAULT_SYNC_SETTINGS.raiderio_batch_every_minutes,0),
+    wcl_refresh_minutes:intVal('adminWclRefresh',DEFAULT_SYNC_SETTINGS.wcl_refresh_minutes,1),
+    wcl_batch_size:intVal('adminWclBatch',DEFAULT_SYNC_SETTINGS.wcl_batch_size,0),
+    wcl_batch_every_minutes:intVal('adminWclBatchEvery',DEFAULT_SYNC_SETTINGS.wcl_batch_every_minutes,0)
+  };
   try{ await sbUpd('app_settings',1,patch); Object.assign(settings,patch); logAction('cambiar_api_config','settings','1',patch); await refresh(true); toast('Configuración guardada'); }
   catch(e){ toast('No se pudo guardar. ¿Corriste SQL 020?'); }
+}
+function applyBackendConfig(){
+  const mode=document.getElementById('adminBackendMode').value;
+  let target='';
+  if(mode==='local') target=LOCAL_API_URL;
+  else if(mode==='supabase') target=SUPABASE_URL;
+  else if(mode==='custom') target=(document.getElementById('adminBackendCustom').value||'').trim().replace(/\/+$/,'');
+  if(mode==='custom' && !/^https?:\/\//i.test(target)) return toast('Poné una URL válida: http:// o https://');
+  if(mode==='auto') localStorage.removeItem(API_OVERRIDE_KEY);
+  else localStorage.setItem(API_OVERRIDE_KEY,target);
+  toast('Backend cambiado. Recargando…');
+  setTimeout(()=>location.reload(),450);
 }
 async function detectWclZones(btn){
   btn=btn||document.getElementById('adminDetectWcl');
@@ -2497,7 +2630,7 @@ async function boot(){
   try{ await fetchAll(); }catch(e){ if(e.status===401){ await doLogout(true); return; } document.getElementById('app').style.display=''; setLive('err','sin conexión'); showError('No se pudo conectar con el gateway seguro. Verificá SQL 019 y las funciones <code>app-auth</code>/<code>app-api</code>.'); return; }
   await ensureFirstWeek(); await fetchAll();
   lastSig=dataSig(); gate();
-  setInterval(()=>{ const busy=document.getElementById('scrim').classList.contains('on')||document.getElementById('scrim2').classList.contains('on')||document.getElementById('login').classList.contains('on')||(document.activeElement&&['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)); if(!busy) refresh(true); },4000);
+  setInterval(()=>{ const busy=document.hidden||document.getElementById('scrim').classList.contains('on')||document.getElementById('scrim2').classList.contains('on')||document.getElementById('login').classList.contains('on')||(document.activeElement&&['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)); if(!busy) refresh(true); },60000);
 }
 boot();
 </script>
