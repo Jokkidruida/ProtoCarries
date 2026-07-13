@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-iFo6XSKhn5Z3f8i8qNpy1HoEw37g19kj/mHMoer0RBU='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co http://localhost:3000 http://127.0.0.1:3000 https://*.trycloudflare.com">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-EKC1TjWfjjr9vTHABlVi9vC6BtJmtB0UsySkjiCR20U='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co http://localhost:3000 http://127.0.0.1:3000 https://*.trycloudflare.com">
 <title>PROTOTYPE · Registro de Carries</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap');
@@ -613,16 +613,42 @@ const SUPABASE_URL = "https://hjatxlvqytgkizcaopce.supabase.co";
 const SUPABASE_KEY = "sb_publishable_s_msjQFbOa5B0SQVF0TE4w_5F4aKk0M";
 const LOCAL_API_URL = "http://localhost:3000";
 const API_OVERRIDE_KEY = 'pt_api_base';
+const API_CONFIG_PATH = 'api-config.json';
+function cleanApiUrl(value){ return String(value||'').trim().replace(/\/+$/,''); }
+function apiBaseFromMode(backend, customUrl=''){
+  const mode=String(backend||'auto').toLowerCase();
+  if(mode==='local') return LOCAL_API_URL;
+  if(mode==='supabase') return SUPABASE_URL;
+  if(mode==='cloudflare' || mode==='custom') return cleanApiUrl(customUrl);
+  return '';
+}
+function publicApiConfigTarget(config){
+  if(!config || typeof config!=='object') return '';
+  const target=apiBaseFromMode(config.backend,config.apiBaseUrl);
+  return /^https?:\/\//i.test(target)?target:'';
+}
 function resolveApiBaseUrl(){
   const qs=new URLSearchParams(location.search);
   const fromQuery=qs.get('api');
-  if(fromQuery){ localStorage.setItem(API_OVERRIDE_KEY,fromQuery); return fromQuery.replace(/\/+$/,''); }
+  if(fromQuery){ localStorage.setItem(API_OVERRIDE_KEY,fromQuery); return cleanApiUrl(fromQuery); }
   const stored=localStorage.getItem(API_OVERRIDE_KEY);
-  if(stored) return stored.replace(/\/+$/,'');
+  if(stored) return cleanApiUrl(stored);
   if(location.protocol==='file:' || location.hostname==='localhost' || location.hostname==='127.0.0.1') return LOCAL_API_URL;
   return SUPABASE_URL;
 }
-const API_BASE_URL = resolveApiBaseUrl();
+let API_BASE_URL = resolveApiBaseUrl();
+async function initApiBaseUrl(){
+  const qs=new URLSearchParams(location.search);
+  if(qs.get('api') || localStorage.getItem(API_OVERRIDE_KEY)) return;
+  if(location.protocol==='file:' || location.hostname==='localhost' || location.hostname==='127.0.0.1') return;
+  try{
+    const res=await fetch(API_CONFIG_PATH,{cache:'no-store'});
+    if(!res.ok) return;
+    const config=await res.json();
+    const target=publicApiConfigTarget(config);
+    if(target) API_BASE_URL=target;
+  }catch(e){}
+}
 /* ============================================================ */
 
 const RAIDS = {
@@ -2377,7 +2403,7 @@ function backendConfigHtml(){
       <div class="field"><input id="adminBackendCustom" value="${esc(custom)}" placeholder="https://tu-tunnel.trycloudflare.com o dominio propio"></div>
       <button class="btn ghost sm" id="adminApplyBackend">Aplicar</button>
     </div>
-    <div class="backendCurrent">Actual: ${esc(API_BASE_URL)}</div>
+    <div class="backendCurrent">Actual: ${esc(API_BASE_URL)} · Aplicar intenta publicar api-config.json para todos</div>
   </div>`;
 }
 function syncNumberField(id,label,value,min=0,max=10080){
@@ -2476,16 +2502,27 @@ async function saveAdminApiConfig(){
   try{ await sbUpd('app_settings',1,patch); Object.assign(settings,patch); logAction('cambiar_api_config','settings','1',patch); await refresh(true); toast('Configuración guardada'); }
   catch(e){ toast('No se pudo guardar. ¿Corriste SQL 020?'); }
 }
-function applyBackendConfig(){
+function backendConfigFromForm(){
   const mode=document.getElementById('adminBackendMode').value;
   let target='';
   if(mode==='local') target=LOCAL_API_URL;
   else if(mode==='supabase') target=SUPABASE_URL;
-  else if(mode==='custom') target=(document.getElementById('adminBackendCustom').value||'').trim().replace(/\/+$/,'');
+  else if(mode==='custom') target=cleanApiUrl(document.getElementById('adminBackendCustom').value||'');
+  return { mode, target, publicConfig: mode==='custom'?{backend:'cloudflare',apiBaseUrl:target}:{backend:mode} };
+}
+async function applyBackendConfig(){
+  const {mode,target,publicConfig}=backendConfigFromForm();
   if(mode==='custom' && !/^https?:\/\//i.test(target)) return toast('Poné una URL válida: http:// o https://');
   if(mode==='auto') localStorage.removeItem(API_OVERRIDE_KEY);
   else localStorage.setItem(API_OVERRIDE_KEY,target);
-  toast('Backend cambiado. Recargando…');
+  let published=false;
+  try{
+    const r=await appRequest('publish_api_config',{config:publicConfig});
+    published=!!r.published;
+  }catch(e){
+    console.warn('api-config publish failed',e);
+  }
+  toast(published?'Backend aplicado y publicado para todos. Recargando…':'Backend aplicado acá. Falta publicar api-config.json. Recargando…');
   setTimeout(()=>location.reload(),450);
 }
 async function detectWclZones(btn){
@@ -2635,5 +2672,5 @@ async function boot(){
   lastSig=dataSig(); gate();
   setInterval(()=>{ const busy=document.hidden||document.getElementById('scrim').classList.contains('on')||document.getElementById('scrim2').classList.contains('on')||document.getElementById('login').classList.contains('on')||(document.activeElement&&['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)); if(!busy) refresh(true); },60000);
 }
-boot();
+initApiBaseUrl().finally(()=>boot());
 </script>

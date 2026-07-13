@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-9PvzHlTMAbVv6kRVGxHAhBIbYnSSl8AU5MN5vwY7v5w='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co http://localhost:3000 http://127.0.0.1:3000 https://*.trycloudflare.com">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-CmGSIp2g+/3fim7q/WeXLOWqeLmhQe1TiSv7eR3Tmnc='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co http://localhost:3000 http://127.0.0.1:3000 https://*.trycloudflare.com">
 <title>PROTOTYPE · Recruitment</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Inter:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap');
@@ -164,16 +164,43 @@
 const SUPABASE_URL = "https://hjatxlvqytgkizcaopce.supabase.co";
 const SUPABASE_KEY = "sb_publishable_s_msjQFbOa5B0SQVF0TE4w_5F4aKk0M";
 const LOCAL_API_URL = "http://localhost:3000";
+const API_OVERRIDE_KEY = "pt_api_base";
+const API_CONFIG_PATH = "api-config.json";
+function cleanApiUrl(value){ return String(value||"").trim().replace(/\/+$/,""); }
+function apiBaseFromMode(backend, customUrl=""){
+  const mode=String(backend||"auto").toLowerCase();
+  if(mode==="local") return LOCAL_API_URL;
+  if(mode==="supabase") return SUPABASE_URL;
+  if(mode==="cloudflare" || mode==="custom") return cleanApiUrl(customUrl);
+  return "";
+}
+function publicApiConfigTarget(config){
+  if(!config || typeof config!=="object") return "";
+  const target=apiBaseFromMode(config.backend,config.apiBaseUrl);
+  return /^https?:\/\//i.test(target)?target:"";
+}
 function resolveApiBaseUrl(){
   const qs=new URLSearchParams(location.search);
   const fromQuery=qs.get("api");
-  if(fromQuery){ localStorage.setItem("pt_api_base",fromQuery); return fromQuery.replace(/\/+$/,""); }
-  const stored=localStorage.getItem("pt_api_base");
-  if(stored) return stored.replace(/\/+$/,"");
+  if(fromQuery){ localStorage.setItem(API_OVERRIDE_KEY,fromQuery); return cleanApiUrl(fromQuery); }
+  const stored=localStorage.getItem(API_OVERRIDE_KEY);
+  if(stored) return cleanApiUrl(stored);
   if(location.protocol==="file:" || location.hostname==="localhost" || location.hostname==="127.0.0.1") return LOCAL_API_URL;
   return SUPABASE_URL;
 }
-const API_BASE_URL = resolveApiBaseUrl();
+let API_BASE_URL = resolveApiBaseUrl();
+async function initApiBaseUrl(){
+  const qs=new URLSearchParams(location.search);
+  if(qs.get("api") || localStorage.getItem(API_OVERRIDE_KEY)) return;
+  if(location.protocol==="file:" || location.hostname==="localhost" || location.hostname==="127.0.0.1") return;
+  try{
+    const res=await fetch(API_CONFIG_PATH,{cache:"no-store"});
+    if(!res.ok) return;
+    const config=await res.json();
+    const target=publicApiConfigTarget(config);
+    if(target) API_BASE_URL=target;
+  }catch(e){}
+}
 const H = () => ({ apikey: SUPABASE_KEY, "Content-Type": "application/json" });
 
 let confirmedCharacter = null;
@@ -299,5 +326,5 @@ document.getElementById("lookupBtn").addEventListener("click", lookupCharacter);
 document.getElementById("form").addEventListener("submit", submitApplication);
 document.getElementById("charName").addEventListener("input", resetConfirmation);
 document.getElementById("realm").addEventListener("change", resetConfirmation);
-loadRealms();
+initApiBaseUrl().finally(()=>loadRealms());
 </script>
