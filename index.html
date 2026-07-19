@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-76Vcw93GPiMK4u1XAuIjN73oooa30q7QX13OH8v+HRI='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co http://localhost:3000 http://127.0.0.1:3000 https://*.trycloudflare.com">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-0odk6IfdvYvKd946vULFOtzmGUvaZrLHV1ksHg3FNu0='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co http://localhost:3000 http://127.0.0.1:3000 https://*.trycloudflare.com">
 <title>PROTOTYPE · Registro de Carries</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap');
@@ -803,6 +803,7 @@ const appRequest=(action,payload={})=>edgeRequest('app-api',{action,...payload},
 const sbIns=(table,row)=>appRequest('mutate',{table,method:'insert',row});
 const sbUpd=(table,id,patch)=>appRequest('mutate',{table,method:'update',id,patch});
 const sbDel=(table,id)=>appRequest('mutate',{table,method:'delete',id});
+const mutationRows=(result)=> Array.isArray(result) ? result : (Array.isArray(result&&result.data) ? result.data : []);
 async function recruitAdmin(method, payload, qs=''){
   const headers=edgeHeaders(true);
   const r=await fetch(API_BASE_URL+'/functions/v1/recruit-admin'+qs,{ method, headers, body:payload?JSON.stringify(payload):undefined });
@@ -860,6 +861,27 @@ async function manualRaiderSync(ch,btn){
     await refresh(true);
   }catch(e){ toast('M+ Score todavía no está conectado'); }
   finally{ if(btn){ btn.disabled=false; btn.textContent=orig||'↻ M+ Score'; } }
+}
+async function syncCharacterArmoryNow(ch){
+  if(!ch||!ch.id||!cap('syncExternal')) return {ok:false, skipped:true};
+  const r=await fetch(API_BASE_URL+'/functions/v1/sync-characters',{ method:'POST', headers:edgeHeaders(true), body:JSON.stringify({source:'manual',characterId:ch.id}) });
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error||j.message||('HTTP '+r.status));
+  logAction('sync_characters','character',ch.id,{target:ch.name,synced:j.synced,failed:(j.failed||[]).length});
+  return {ok:true, data:j};
+}
+function syncCharacterSecondarySoon(ch){
+  if(!ch||!ch.id||!cap('syncExternal')) return;
+  const calls=[
+    ['sync-raiderio',{characterId:ch.id}],
+    ['sync-warcraftlogs',{scope:'character',characterId:ch.id}],
+  ];
+  Promise.allSettled(calls.map(([fn,body])=>edgeRequest(fn,body,true))).then(results=>{
+    const failed=results.filter(r=>r.status==='rejected').length;
+    if(failed) console.warn('External character sync partial failure', ch.name, results);
+    logAction('sync_external_background','character',ch.id,{target:ch.name,failed}).catch(()=>{});
+    refresh(true).catch(()=>{});
+  });
 }
 
 /* ---------- util ---------- */
@@ -2131,7 +2153,15 @@ function openNewChar(){
     if(!name){ err.textContent='Poné el nombre del personaje.'; return false; }
     if(!slug||!region){ err.textContent='Elegí un servidor de la lista (no vale escribirlo libre).'; return false; }
     if(characters.find(x=>x.name.toLowerCase()===name.toLowerCase() && x.realm_slug===slug)){ err.textContent='Ya existe ese personaje en ese realm.'; return false; }
-    try{ await sbIns('characters',{ name, role:rl, realm_slug:slug, region, active:true }); logAction('crear_personaje','character',name,{target:name}); await refresh(); toast('Personaje agregado — Armory, WCL y Raider.IO quedan en cola'); }
+    try{
+      const rows=mutationRows(await sbIns('characters',{ name, role:rl, realm_slug:slug, region, active:true }));
+      const ch=(rows&&rows[0])||{id:null,name,realm_slug:slug,region,role:rl};
+      logAction('crear_personaje','character',ch.id||name,{target:name,realm:slug});
+      try{ await syncCharacterArmoryNow(ch); }catch(syncErr){ console.warn('Armory sync failed for new character', syncErr); }
+      syncCharacterSecondarySoon(ch);
+      await refresh(true);
+      toast('Personaje agregado y sincronizando APIs');
+    }
     catch(e){ err.textContent='No se pudo crear.'; return false; }
   });
   wireRealmPicker();
@@ -2144,7 +2174,19 @@ function openEditChar(idv){
     const rl=document.getElementById('ch_role').value;
     const err=document.getElementById('ch_err'); err.textContent='';
     if(!name){ err.textContent='Poné el nombre del personaje.'; return false; }
-    try{ await sbUpd('characters',ch.id,{ name, role:rl, realm_slug:slug, region }); logAction('editar_personaje','character',ch.id,{target:name}); await refresh(); toast('Personaje actualizado'); }
+    try{
+      const identityChanged=name.toLowerCase()!==String(ch.name||'').toLowerCase() || slug!==ch.realm_slug || region!==ch.region;
+      const needsSync=!characterProgress.find(p=>String(p.character_id)===String(ch.id) && p.synced_ok!==false);
+      const rows=mutationRows(await sbUpd('characters',ch.id,{ name, role:rl, realm_slug:slug, region }));
+      const updated=(rows&&rows[0])||{...ch,name,role:rl,realm_slug:slug,region};
+      logAction('editar_personaje','character',ch.id,{target:name});
+      if(identityChanged||needsSync){
+        try{ await syncCharacterArmoryNow(updated); }catch(syncErr){ console.warn('Armory sync failed after character edit', syncErr); }
+        syncCharacterSecondarySoon(updated);
+      }
+      await refresh(true);
+      toast(identityChanged||needsSync?'Personaje actualizado y sincronizando APIs':'Personaje actualizado');
+    }
     catch(e){ err.textContent='No se pudo guardar.'; return false; }
   });
   wireRealmPicker();
@@ -2153,7 +2195,17 @@ async function toggleCharActive(idv){
   const ch=characters.find(x=>x.id===idv); if(!ch) return;
   const nv=!(ch.active!==false);
   if(!confirm((nv?'¿Reactivar':'¿Dar de baja')+' a "'+ch.name+'"?')) return;
-  try{ await sbUpd('characters',ch.id,{active:nv,deactivated_at:nv?null:new Date().toISOString()}); logAction(nv?'reactivar_personaje':'dar_baja_personaje','character',ch.id,{target:ch.name}); await refresh(); toast(nv?'Restaurado al roster':'Dado de baja'); }
+  try{
+    const rows=mutationRows(await sbUpd('characters',ch.id,{active:nv,deactivated_at:nv?null:new Date().toISOString()}));
+    const updated=(rows&&rows[0])||{...ch,active:nv};
+    logAction(nv?'reactivar_personaje':'dar_baja_personaje','character',ch.id,{target:ch.name});
+    if(nv){
+      try{ await syncCharacterArmoryNow(updated); }catch(syncErr){ console.warn('Armory sync failed after restore', syncErr); }
+      syncCharacterSecondarySoon(updated);
+    }
+    await refresh(true);
+    toast(nv?'Restaurado al roster y sincronizando APIs':'Dado de baja');
+  }
   catch(e){ toast('No se pudo'); }
 }
 async function deleteCharacterForever(idv){
