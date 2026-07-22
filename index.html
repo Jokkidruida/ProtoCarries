@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-Cm9kI8iwNEJ11ad0DXL6F2+4sybOzhSWPIyaTk1f8vg='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co http://localhost:3000 http://127.0.0.1:3000 https://*.trycloudflare.com">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-ysz6zRJrfqT7qLPtF9tVfpJjziPnmknr7zzhk5JVAFI='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co http://localhost:3000 http://127.0.0.1:3000 https://*.trycloudflare.com">
 <title>PROTOTYPE · Registro de Carries</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap');
@@ -2489,6 +2489,7 @@ function renderRaid(k,w){
 /* ---------- CALENDARIO ---------- */
 const RAID_EVENT_STATUS={planned:'Planificado',open:'Abierto',closed:'Cerrado',cancelled:'Cancelado'};
 const RAID_EVENT_TYPE={raid:'Raid',carry:'Carry',mplus:'M+',guild:'Guild',daily:'Actividades Diarias',achievement:'Logros',other:'Otro'};
+const SEGMENT_STATUS={pending:'Pendiente',progress:'En progreso',killed:'Kill',reclear:'Reclear',done:'Hecho',postponed:'Postergado'};
 const ATT_STATUS={present:'Presente',bench:'Banca',absent_notice:'Ausente avisó',absent_no_notice:'Ausente sin aviso',late:'Tarde',left_early:'Se fue antes',partial:'Parcial',not_required:'No requerido'};
 function attendanceStatusOptionsHtml(value){
   const current=value==null?'':String(value);
