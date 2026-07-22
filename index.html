@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-V/g1HEh/Iqui8B7cEGC/bHrCm/qZkQdRSuZwG8L2DRQ='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co http://localhost:3000 http://127.0.0.1:3000 https://*.trycloudflare.com">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-skcA5QboIKu5eQweA1ObEoP/gfPFHXtHp5yqGEdNzuQ='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co http://localhost:3000 http://127.0.0.1:3000 https://*.trycloudflare.com">
 <title>PROTOTYPE · Registro de Carries</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap');
@@ -234,13 +234,14 @@
   .field textarea{resize:vertical; min-height:54px}
   .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
   .segEditor{border:1px solid var(--line-soft); border-radius:12px; overflow:hidden; background:var(--bg)}
-  .segTools{display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px; border-bottom:1px solid var(--line-soft); background:var(--bg-1)}
+  .segTools{display:flex; flex-wrap:nowrap; gap:8px; align-items:center; padding:10px; border-bottom:1px solid var(--line-soft); background:var(--bg-1); overflow:auto}
   .segGrid{display:grid; grid-template-columns:28px 1.15fr .85fr 1fr 1.1fr .9fr 1.1fr 92px; min-width:1080px}
   .segGrid.head{font-family:var(--font-display); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted-2); background:var(--bg-1)}
   .segGrid>div{padding:8px 7px; border-bottom:1px solid var(--line-soft); min-width:0}
   .segGrid select,.segGrid input{width:100%; min-width:0; border-radius:7px; border:1px solid var(--line); background:var(--bg-0)!important; color:var(--text)!important; -webkit-text-fill-color:var(--text); padding:7px 8px; font-size:12px}
   .segGrid select option{background:var(--bg-1)!important; color:var(--text)!important}
-  .segTools select{height:30px; border-radius:8px; border:1px solid var(--line); background:var(--bg-0)!important; color:var(--text)!important; padding:0 8px; font-size:12px; font-weight:800}
+  .segTools select{width:auto!important; min-width:150px; max-width:260px; flex:0 0 auto; height:30px; border-radius:8px; border:1px solid var(--line); background:var(--bg-0)!important; color:var(--text)!important; padding:0 8px; font-size:12px; font-weight:800}
+  .segTools button{flex:0 0 auto; white-space:nowrap}
   .segGrid .segOps{display:flex; gap:4px}
   .segGrid .segOps button{width:24px; height:24px; padding:0; border-radius:7px}
   .segRow{cursor:grab}
@@ -507,6 +508,11 @@
   .attendanceTabs{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 12px}
   .attendanceTab{border:1px solid var(--line); background:var(--bg); color:var(--text); border-radius:9px; padding:8px 12px; font-weight:900; cursor:pointer}
   .attendanceTab.on{border-color:var(--blue); color:var(--blue); background:rgba(0,155,219,.12)}
+  .attendanceFilters{display:grid; grid-template-columns:repeat(6,minmax(130px,1fr)); gap:8px; margin:0 0 12px}
+  .attendanceFilters .field{margin:0}
+  .attendanceFilters input,.attendanceFilters select{height:34px; padding:7px 9px; font-size:12px}
+  @media(max-width:1100px){.attendanceFilters{grid-template-columns:repeat(3,minmax(130px,1fr))}}
+  @media(max-width:680px){.attendanceFilters{grid-template-columns:1fr}}
   .attToolbar{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px}
   .attMatrixWrap{margin-bottom:14px}
   .attMatrix{border-collapse:collapse; min-width:980px; width:100%; font-size:12px}
@@ -877,6 +883,7 @@ let recruits=[], recruitFilter={q:"",status:"open"}, recruitLoadError='', recrui
 let progView='general', progSearch='', progClass='all', progRole='all', progSort={col:'ilvl',dir:-1};
 let attendanceFilter={period:'30',from:'',to:''};
 let attendanceSubView='basic';
+let attendanceViewFilter={status:'all',range:'month1',from:'',to:'',type:'all',instance:'all',difficulty:'all',boss:'all',sort:'asc'};
 let calendarMode='month', calendarCursor=new Date(), selectedRaidEventId='', attendanceEventId='';
 let selectedCalendarEvents=new Set();
 let singleCharId='', singleWclZone='46', singleWclMetric='dps', singleWclDifficulty='5', singleRioSpec='';
@@ -2516,6 +2523,8 @@ function eventEndDate(ev){ const d=eventStartDate(ev); d.setMinutes(d.getMinutes
 function eventDue(ev){ return !['closed','cancelled'].includes(ev.status) && eventEndDate(ev) <= new Date(); }
 function recurrenceGroup(ev){ return String(ev&&ev.recurrence_group_id || ev&&ev.id || ''); }
 function eventSegments(ev){ const eventId=ev&&ev._template_id?ev._template_id:ev&&ev.id; return raidEventSegments.filter(s=>String(s.event_id)===String(eventId)).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)); }
+function addDays(dt,n){ const d=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate()); d.setDate(d.getDate()+n); return d; }
+function addMonths(dt,n){ const d=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate()); d.setMonth(d.getMonth()+n); return d; }
 function recurrenceDays(ev){
   const picked=arrish(ev&&ev.recurrence_days).map(Number).filter(n=>Number.isInteger(n)&&n>=0&&n<=6);
   if(picked.length) return [...new Set(picked)].sort((a,b)=>a-b);
@@ -2573,8 +2582,8 @@ async function ensureDueAttendance(){
 }
 function attendanceCandidateEvents(){
   const out=[], seen=new Set(), today=new Date();
-  const start=new Date(today); start.setDate(start.getDate()-30);
-  for(let i=0;i<92;i++){
+  const start=addDays(today,-180);
+  for(let i=0;i<545;i++){
     const d=new Date(start); d.setDate(start.getDate()+i);
     calendarEventsForDay(isoLocal(d)).forEach(ev=>{
       if(seen.has(String(ev.id))) return;
@@ -2583,6 +2592,66 @@ function attendanceCandidateEvents(){
   }
   return out.filter(ev=>ev.event_type==='raid'||ev.event_type==='carry'||ev.event_type==='guild'||ev.event_type==='other')
     .sort((a,b)=>sameDayKey(b.event_date).localeCompare(sameDayKey(a.event_date)) || String(b.start_time||'').localeCompare(String(a.start_time||'')));
+}
+function attendanceFilterBounds(){
+  const today=new Date(), range=attendanceViewFilter.range||'all';
+  let from='', to='';
+  if(range==='custom'){ from=attendanceViewFilter.from||''; to=attendanceViewFilter.to||''; }
+  if(range==='this_week'){ const s=calendarWeekStartDate(today); from=isoLocal(s); to=isoLocal(addDays(s,6)); }
+  if(range==='next2'){ from=isoLocal(today); to=isoLocal(addDays(today,14)); }
+  if(range==='next3'){ from=isoLocal(today); to=isoLocal(addDays(today,21)); }
+  if(range==='month1'){ from=isoLocal(today); to=isoLocal(addMonths(today,1)); }
+  if(range==='month2'){ from=isoLocal(today); to=isoLocal(addMonths(today,2)); }
+  if(range==='month3'){ from=isoLocal(today); to=isoLocal(addMonths(today,3)); }
+  return {from,to};
+}
+function eventMatchesAttendanceFilters(ev){
+  const key=sameDayKey(ev.event_date), now=new Date();
+  const status=attendanceViewFilter.status||'all';
+  if(status==='pending' && (ev.status==='closed'||ev.status==='cancelled'||eventEndDate(ev)<now)) return false;
+  if(status==='past' && !(ev.status==='closed'||eventEndDate(ev)<now)) return false;
+  if(status==='closed' && ev.status!=='closed') return false;
+  if(status==='open' && ev.status!=='open') return false;
+  const {from,to}=attendanceFilterBounds();
+  if(from && key<from) return false;
+  if(to && key>to) return false;
+  if(attendanceViewFilter.type!=='all' && ev.event_type!==attendanceViewFilter.type) return false;
+  const segs=eventSegments(ev);
+  const instance=attendanceViewFilter.instance, difficulty=attendanceViewFilter.difficulty, boss=attendanceViewFilter.boss;
+  if(instance!=='all' && !segs.some(s=>String(s.instance_name||'')===instance)) return false;
+  if(difficulty!=='all' && !segs.some(s=>String(s.difficulty||'')===difficulty)) return false;
+  if(boss!=='all' && !segs.some(s=>arrish(s.bosses).includes(boss))) return false;
+  return true;
+}
+function filteredAttendanceEvents(events){
+  const dir=attendanceViewFilter.sort==='desc'?-1:1;
+  return events.filter(eventMatchesAttendanceFilters).sort((a,b)=>dir*(sameDayKey(a.event_date).localeCompare(sameDayKey(b.event_date)) || String(a.start_time||'').localeCompare(String(b.start_time||''))));
+}
+function attendanceFilterBarHtml(events){
+  const instanceOptions=raidInstanceOptions();
+  const bossSource=attendanceViewFilter.instance==='all' ? [...new Set(instanceOptions.flatMap(raidBossOptions))] : raidBossOptions(attendanceViewFilter.instance);
+  if(attendanceViewFilter.boss!=='all' && !bossSource.includes(attendanceViewFilter.boss)) attendanceViewFilter.boss='all';
+  const types=[...new Set(events.map(e=>e.event_type).filter(Boolean))];
+  return `<div class="attendanceFilters">
+    <div class="field"><label>Estado fecha</label><select data-att-filter="status">${labeledOptionsHtml([['all','Todos'],['pending','Pendientes'],['past','Pasados'],['open','Abiertos'],['closed','Cerrados']],attendanceViewFilter.status)}</select></div>
+    <div class="field"><label>Rango</label><select data-att-filter="range">${labeledOptionsHtml([['all','Todo'],['this_week','Esta semana'],['next2','Próx. 2 semanas'],['next3','Próx. 3 semanas'],['month1','Próx. 1 mes'],['month2','Próx. 2 meses'],['month3','Próx. 3 meses'],['custom','Fechas específicas']],attendanceViewFilter.range)}</select></div>
+    <div class="field"><label>Desde</label><input type="date" data-att-filter="from" value="${esc(attendanceViewFilter.from||'')}"></div>
+    <div class="field"><label>Hasta</label><input type="date" data-att-filter="to" value="${esc(attendanceViewFilter.to||'')}"></div>
+    <div class="field"><label>Tipo</label><select data-att-filter="type">${allOptionsHtml(types,attendanceViewFilter.type,'Todos los tipos')}</select></div>
+    <div class="field"><label>Instancia</label><select data-att-filter="instance">${allOptionsHtml(instanceOptions,attendanceViewFilter.instance,'Todas')}</select></div>
+    <div class="field"><label>Dificultad</label><select data-att-filter="difficulty">${allOptionsHtml(segmentDifficultyOptions(),attendanceViewFilter.difficulty,'Todas')}</select></div>
+    <div class="field"><label>Boss</label><select data-att-filter="boss">${allOptionsHtml(bossSource,attendanceViewFilter.boss,'Todos')}</select></div>
+    <div class="field"><label>Orden</label><select data-att-filter="sort">${labeledOptionsHtml([['asc','Viejos primero'],['desc','Nuevos primero']],attendanceViewFilter.sort)}</select></div>
+  </div>`;
+}
+function bindAttendanceFilters(root){
+  root.querySelectorAll('[data-att-filter]').forEach(el=>el.onchange=()=>{
+    attendanceViewFilter[el.dataset.attFilter]=el.value||'';
+    if(el.dataset.attFilter==='range' && el.value!=='custom'){ attendanceViewFilter.from=''; attendanceViewFilter.to=''; }
+    if(el.dataset.attFilter==='from' || el.dataset.attFilter==='to') attendanceViewFilter.range='custom';
+    if(el.dataset.attFilter==='instance') attendanceViewFilter.boss='all';
+    renderAttendance();
+  });
 }
 function findAttendanceEvent(id, list){
   return (list||attendanceCandidateEvents()).find(ev=>String(ev.id)===String(id)) || raidEvents.find(ev=>String(ev.id)===String(id));
@@ -2595,7 +2664,7 @@ function attendanceStatusSummary(ev){
   return `${done}/${total} completados${absent?` · ${absent} ausentes`:''}`;
 }
 function attendanceMatrixEvents(events){
-  return events.filter(ev=>!ev._virtual && ev.status!=='cancelled').sort((a,b)=>sameDayKey(a.event_date).localeCompare(sameDayKey(b.event_date)) || String(a.start_time||'').localeCompare(String(b.start_time||''))).slice(-12);
+  return events.filter(ev=>!ev._virtual && ev.status!=='cancelled').sort((a,b)=>sameDayKey(a.event_date).localeCompare(sameDayKey(b.event_date)) || String(a.start_time||'').localeCompare(String(b.start_time||'')));
 }
 function attendanceRosterRows(){
   return characters.filter(ch=>!ch.is_recruit_shadow && ch.active!==false && ['raider','trial'].includes(String(ch.roster_category||'raider'))).sort((a,b)=>String(a.role||'').localeCompare(String(b.role||'')) || String(a.class||'').localeCompare(String(b.class||'')) || String(a.name).localeCompare(String(b.name)));
@@ -2689,8 +2758,19 @@ async function materializeAndOpenAttendance(ev){
 }
 function renderAttendance(){
   const c=document.getElementById('content');
-  const events=attendanceCandidateEvents();
-  if(!events.length){ c.innerHTML='<div class="empty" style="padding:60px"><b>Sin eventos</b>Creá raids desde Calendario para poder pasar attendance.</div>'; return; }
+  const allEvents=attendanceCandidateEvents();
+  if(!allEvents.length){ c.innerHTML='<div class="empty" style="padding:60px"><b>Sin eventos</b>Creá raids desde Calendario para poder pasar attendance.</div>'; return; }
+  const events=filteredAttendanceEvents(allEvents);
+  if(!events.length){
+    c.innerHTML=`<div class="wbar"><div class="sectitle" style="margin:0">Attendance</div><div class="actions">${cap('manageCalendar')?'<button class="btn primary sm" id="attNewEvent">+ Evento</button>':''}</div></div>
+      ${attendanceFilterBarHtml(allEvents)}
+      <div class="attendanceTabs"><button class="attendanceTab ${attendanceSubView==='basic'?'on':''}" data-att-tab="basic">Básica</button><button class="attendanceTab ${attendanceSubView==='advanced'?'on':''}" data-att-tab="advanced">Avanzada</button></div>
+      <div class="empty" style="padding:44px"><b>Sin resultados</b>No hay eventos que coincidan con esos filtros.</div>`;
+    bindAttendanceFilters(c);
+    c.querySelectorAll('[data-att-tab]').forEach(b=>b.onclick=()=>{ attendanceSubView=b.dataset.attTab; renderAttendance(); });
+    const nb=document.getElementById('attNewEvent'); if(nb) nb.onclick=()=>openRaidEventForm(null, isoLocal(new Date()));
+    return;
+  }
   if(!attendanceEventId || !findAttendanceEvent(attendanceEventId,events)) attendanceEventId=(events.find(eventDue)||events[0]).id;
   const ev=findAttendanceEvent(attendanceEventId,events);
   const list=events.map(e=>`<button class="attendancePick ${String(e.id)===String(attendanceEventId)?'on':''}" data-att-event="${esc(e.id)}"><b>${esc(fmtDate(e.event_date))} · ${esc(e.title)}</b><span>${esc(String(e.start_time||'').slice(0,5))}-${esc(String(e.end_time||'').slice(0,5))} · ${esc(RAID_EVENT_STATUS[e.status]||e.status)} · ${esc(eventLabel(e))}${e._virtual?' · recurrente':''}</span></button>`).join('');
@@ -2700,8 +2780,10 @@ function renderAttendance(){
   const basic=attendanceMatrixHtml(events);
   const advanced=`<div class="attendanceShell"><div class="panel"><div class="phead"><h2><span class="dia"></span>Eventos</h2><div class="sub">Pasar lista por raid</div></div><div class="pbody attendanceList">${list}</div></div>${right}</div>`;
   c.innerHTML=`<div class="wbar"><div class="sectitle" style="margin:0">Attendance</div><div class="actions">${cap('manageCalendar')?'<button class="btn primary sm" id="attNewEvent">+ Evento</button>':''}</div></div>
+    ${attendanceFilterBarHtml(allEvents)}
     <div class="attendanceTabs"><button class="attendanceTab ${attendanceSubView==='basic'?'on':''}" data-att-tab="basic">Básica</button><button class="attendanceTab ${attendanceSubView==='advanced'?'on':''}" data-att-tab="advanced">Avanzada</button></div>
     ${attendanceSubView==='advanced'?advanced:basic}`;
+  bindAttendanceFilters(c);
   c.querySelectorAll('[data-att-tab]').forEach(b=>b.onclick=()=>{ attendanceSubView=b.dataset.attTab; renderAttendance(); });
   c.querySelectorAll('[data-att-event]').forEach(b=>b.onclick=()=>{ attendanceEventId=b.dataset.attEvent; renderAttendance(); });
   const matrixSave=document.getElementById('attMatrixSave'); if(matrixSave) matrixSave.onclick=saveAttendanceMatrix;
@@ -2709,7 +2791,7 @@ function renderAttendance(){
   const ov=document.getElementById('attOpenVirtual'); if(ov) ov.onclick=()=>materializeAndOpenAttendance(ev);
   const edit=document.getElementById('attEditEvent'); if(edit) edit.onclick=()=>openRaidEventForm(ev.id,sameDayKey(ev.event_date));
   const del=document.getElementById('attDeleteEvent'); if(del) del.onclick=()=>deleteRaidEvent(ev);
-  const save=document.getElementById('attSavePage'); if(save) save.onclick=()=>saveAttendanceRows(ev);
+  const save=document.getElementById('attSavePage'); if(save) save.onclick=()=>saveAttendanceRows(ev,c);
   const saveSegments=document.getElementById('attSaveSegments'); if(saveSegments) saveSegments.onclick=()=>saveAttendanceSegments(ev,c);
   const close=document.getElementById('attClosePage'); if(close) close.onclick=()=>closeAttendanceEvent(ev);
   if(c.querySelector('#segRows')) bindSegmentEditor(c);
@@ -2849,6 +2931,14 @@ function optionsHtml(options,current,blankLabel){
   const blank=blankLabel==null?'':`<option value="">${esc(blankLabel)}</option>`;
   return blank+options.map(x=>`<option value="${esc(x)}" ${String(current||'')===String(x)?'selected':''}>${esc(x)}</option>`).join('');
 }
+function labeledOptionsHtml(options,current){
+  return options.map(([value,label])=>`<option value="${esc(value)}" ${String(current||'')===String(value)?'selected':''}>${esc(label)}</option>`).join('');
+}
+function allOptionsHtml(options,current,label='Todos'){
+  const items=[['all',label],...options.filter(Boolean).map(x=>[x,x])];
+  if(current && current!=='all' && !options.includes(current)) items.splice(1,0,[current,current]);
+  return labeledOptionsHtml(items,current||'all');
+}
 function saleOptionLabel(s){
   const w=state.weeks.find(x=>x.id===s.week_id);
   return `${s.buyer||'Carry'} · ${w?w.label:fmtDate(s.run_date||w&&w.date||'')} · ${fmtGold(s.gold)}`;
@@ -2863,7 +2953,7 @@ function saleMatchesSegment(s,instance,boss){
 function segmentSaleOptions(instance,boss,selected){
   const selectedSet=new Set(arrish(selected).map(String));
   const opts=allSales().filter(s=>saleMatchesSegment(s,instance,boss) || selectedSet.has(String(s.id)));
-  return `<option value="">No</option>`+opts.map(s=>`<option value="${esc(s.id)}" ${selectedSet.has(String(s.id))?'selected':''}>${esc(saleOptionLabel(s))}</option>`).join('');
+  return `<option value="" ${selectedSet.size?'':'selected'}>No</option>`+opts.map(s=>`<option value="${esc(s.id)}" ${selectedSet.has(String(s.id))?'selected':''}>${esc(saleOptionLabel(s))}</option>`).join('');
 }
 function segmentStatusOptions(value,hasSale){
   const keys=hasSale?['pending','done','postponed']:['pending','progress','killed','reclear'];
@@ -2959,6 +3049,15 @@ function bindSegmentEditor(root=document){
       if(e.target.classList.contains('segInstance')) refreshSegmentBossSelect(row,'');
       const instance=row.querySelector('.segInstance').value, boss=row.querySelector('.segBoss').value;
       const sales=row.querySelector('.segSales');
+      if(e.target.classList.contains('segSales')){
+        const pickedNow=[...sales.selectedOptions].map(o=>o.value);
+        if(pickedNow.includes('')){
+          [...sales.options].forEach(o=>{ o.selected=o.value===''; });
+        }else{
+          const no=sales.querySelector('option[value=""]');
+          if(no) no.selected=false;
+        }
+      }
       const picked=[...sales.selectedOptions].map(o=>o.value).filter(Boolean);
       sales.innerHTML=segmentSaleOptions(instance,boss,picked);
       row.querySelector('.segStatus').innerHTML=segmentStatusOptions(row.querySelector('.segStatus').value,picked.length>0);
@@ -3063,6 +3162,23 @@ async function applySegmentCarryDone(segments){
     const s=allSales().find(x=>String(x.id)===id);
     if(s && s.done!==true) await sbUpd('sales',id,{done:true});
   }
+}
+async function concreteEventForSegmentSave(ev){
+  if(!ev) return ev;
+  if(ev._virtual || ev.recurrence==='weekly'){
+    const real=await materializeRecurringEvent(ev);
+    if(real&&real.id){
+      selectedRaidEventId=real.id;
+      attendanceEventId=real.id;
+      return real;
+    }
+  }
+  return ev;
+}
+async function saveSegmentsFromEditorForEvent(ev,root=document){
+  const real=await concreteEventForSegmentSave(ev);
+  await saveEventSegments(real.id,parseSegmentsFromEditor(root));
+  return real;
 }
 async function materializeRecurringEvent(ev){
   const template=ev._template_id ? raidEvents.find(x=>String(x.id)===String(ev._template_id)) : ev;
@@ -3194,30 +3310,37 @@ async function openRaidEventDetail(eventId){
   </div>${segmentBlock}
   ${attendanceTableHtml(ev)}</div>`;
   const actions=`<div class="actions" style="margin-top:12px">${cap('manageCalendar')?'<button class="btn ghost sm" id="evEdit">Editar evento</button><button class="btn ghost sm danger" id="evDelete">Eliminar evento</button>':''}${cap('manageAttendance')?'<button class="btn primary sm" id="attSave">Guardar attendance</button>':''}${cap('closeAttendance')&&ev.status!=='closed'?'<button class="btn ghost sm" id="attClose">Cerrar evento</button>':''}</div>`;
-  openM2(ev.title, table+actions, async()=>true,{wide:true});
+  openM2(ev.title, table+actions, async()=>{
+    const root=document.getElementById('m2body')||document;
+    let real=ev;
+    if(cap('manageCalendar') && root.querySelector('#segRows')) real=await saveSegmentsFromEditorForEvent(ev,root);
+    if(cap('manageAttendance') && root.querySelector('.attendanceTable')) await saveAttendanceRows(real,root);
+    toast('Evento guardado');
+    return true;
+  },{wide:true});
   const eb=document.getElementById('evEdit'); if(eb) eb.onclick=()=>openRaidEventForm(ev.id,sameDayKey(ev.event_date));
   const db=document.getElementById('evDelete'); if(db) db.onclick=()=>deleteRaidEvent(ev);
-  const sb=document.getElementById('attSave'); if(sb) sb.onclick=()=>saveAttendanceRows(ev);
+  const sb=document.getElementById('attSave'); if(sb) sb.onclick=()=>saveAttendanceRows(ev,document.getElementById('m2body')||document);
   const ds=document.getElementById('detailSaveSegments'); if(ds) ds.onclick=async()=>{
     const root=document.getElementById('m2body')||document;
     try{
-      await saveEventSegments(ev.id,parseSegmentsFromEditor(root));
+      const real=await saveSegmentsFromEditorForEvent(ev,root);
       await refresh(true);
       toast('Segmentos guardados');
-      openRaidEventDetail(ev.id);
-    }catch(e){ toast('No se pudieron guardar segmentos'); }
+      openRaidEventDetail(real.id);
+    }catch(e){ console.error('save detail segments failed',e); toast('No se pudieron guardar segmentos: '+String(e&&e.message||'error').slice(0,90)); }
   };
   const cb=document.getElementById('attClose'); if(cb) cb.onclick=()=>closeAttendanceEvent(ev);
   if(document.getElementById('m2body')?.querySelector('#segRows')) bindSegmentEditor(document.getElementById('m2body'));
   bindAttendanceQuickTimes(document.getElementById('m2body'));
 }
-async function saveAttendanceRows(ev){
+async function saveAttendanceRows(ev,root=document){
   if(!cap('manageAttendance')) return toast('Sin permiso');
   try{
     await appRequest('ensure_attendance',{event_id:ev.id});
     await fetchAll();
     const freshByChar=new Map(raidAttendance.filter(a=>String(a.event_id)===String(ev.id)).map(a=>[String(a.character_id),a]));
-    const rows=[...document.querySelectorAll('.attendanceTable tbody tr')];
+    const rows=[...root.querySelectorAll('.attendanceTable tbody tr')];
     for(const tr of rows){
       const status=tr.querySelector('.attStatus').value||null;
       const patch={ status, arrival_time:tr.querySelector('.attArrival').value||null, leave_time:tr.querySelector('.attLeave').value||null, away_minutes:Number(tr.querySelector('.attAway').value||0), note:tr.querySelector('.attNote').value.trim()||null };
@@ -3227,18 +3350,19 @@ async function saveAttendanceRows(ev){
     }
     logAction('editar_attendance','raid_event',ev.id,{target:ev.title});
     await refresh(true); toast('Attendance guardado');
-  }catch(e){ toast('No se pudo guardar attendance'); }
+  }catch(e){ console.error('save attendance failed',e); toast('No se pudo guardar attendance'); }
 }
 async function saveAttendanceSegments(ev,root=document){
   if(!cap('manageCalendar')) return toast('Sin permiso');
-  if(!ev || ev._virtual) return toast('Abrí primero esa fecha recurrente.');
+  if(!ev) return toast('Evento no encontrado');
   try{
-    await saveEventSegments(ev.id,parseSegmentsFromEditor(root));
-    logAction('editar_segmentos_attendance','raid_event',ev.id,{target:ev.title});
+    const real=await saveSegmentsFromEditorForEvent(ev,root);
+    logAction('editar_segmentos_attendance','raid_event',real.id,{target:real.title});
     await refresh(true);
     toast('Segmentos guardados');
   }catch(e){
-    toast('No se pudieron guardar segmentos');
+    console.error('save attendance segments failed',e);
+    toast('No se pudieron guardar segmentos: '+String(e&&e.message||'error').slice(0,90));
   }
 }
 async function closeAttendanceEvent(ev){
