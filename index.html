@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-AdPx4I/YBrmy+WUSTAtJagiRnVltUeJ3sLZksM47vJU='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co http://localhost:3000 http://127.0.0.1:3000 https://*.trycloudflare.com">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-bnT6MeiXJHBjn/u+Tp+0VYCYfuhAQYYY2swd4Z0bowY='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://hjatxlvqytgkizcaopce.supabase.co http://localhost:3000 http://127.0.0.1:3000 https://*.trycloudflare.com">
 <title>PROTOTYPE · Registro de Carries</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap');
@@ -865,10 +865,20 @@ const DEFAULT_SYNC_SETTINGS = {
 };
 const DEFAULT_CALENDAR_SETTINGS = {
   calendar_week_start_dow:2,
-  calendar_timezone_mode:'local',
-  calendar_timezone_offset_minutes:-180,
-  calendar_timezone_label:'America/Buenos_Aires'
+  calendar_timezone_mode:'server',
+  calendar_timezone_offset_minutes:-360,
+  calendar_timezone_label:'CST / Server time'
 };
+const CALENDAR_TZ_LABELS = [
+  ['CST / Server time','CST / Server time'],
+  ['America/Buenos_Aires','America/Buenos_Aires'],
+  ['GMT-3','GMT-3'],
+  ['GMT-4','GMT-4'],
+  ['GMT-5','GMT-5'],
+  ['GMT-6','GMT-6'],
+  ['UTC','UTC']
+];
+const CALENDAR_TZ_OFFSETS = {'CST / Server time':-360,'America/Buenos_Aires':-180,'GMT-3':-180,'GMT-4':-240,'GMT-5':-300,'GMT-6':-360,'UTC':0};
 function normalizePerms(value){
   const src=(value&&typeof value==='object'&&!Array.isArray(value))?value:{};
   const out={};
@@ -2526,8 +2536,19 @@ function sameDayKey(d){ return isoLocal(parseLocalDate(d)); }
 function minutesOf(t){ const m=String(t||'').match(/^(\d{1,2}):(\d{2})/); return m?(Number(m[1])*60+Number(m[2])):null; }
 function eventDurationMinutes(ev){ const s=minutesOf(ev.start_time), e=minutesOf(ev.end_time); if(s==null||e==null) return 180; return Math.max(1,e>s?e-s:e+1440-s); }
 function eventTimezoneMode(ev){ return String(ev&&ev.timezone_mode||settings.calendar_timezone_mode||'local'); }
-function eventTimezoneOffset(ev){ return Number((ev&&ev.timezone_offset_minutes)??settings.calendar_timezone_offset_minutes??-180); }
-function eventTimezoneLabel(ev){ return String((ev&&ev.timezone_label)||settings.calendar_timezone_label||(eventTimezoneMode(ev)==='server'?'Server time':'Hora local')); }
+function calendarTimezoneDefaultLabel(mode){ return mode==='server'?'CST / Server time':(mode==='fixed'?'GMT-3':'America/Buenos_Aires'); }
+function normalizeCalendarTimezoneLabel(mode,label){ return mode==='server'?'CST / Server time':(CALENDAR_TZ_OFFSETS[String(label||'')]!=null?String(label):calendarTimezoneDefaultLabel(mode)); }
+function calendarTimezoneOffset(mode,label,fallback){
+  if(mode==='server') return -360;
+  const normalized=normalizeCalendarTimezoneLabel(mode,label);
+  return Number(CALENDAR_TZ_OFFSETS[normalized]??fallback??DEFAULT_CALENDAR_SETTINGS.calendar_timezone_offset_minutes);
+}
+function calendarTimezoneLabelOptionsHtml(mode,value){
+  const selected=normalizeCalendarTimezoneLabel(mode,value);
+  return CALENDAR_TZ_LABELS.map(([v,l])=>`<option value="${esc(v)}" ${selected===v?'selected':''}>${esc(l)}</option>`).join('');
+}
+function eventTimezoneOffset(ev){ return calendarTimezoneOffset(eventTimezoneMode(ev),(ev&&ev.timezone_label)||settings.calendar_timezone_label,(ev&&ev.timezone_offset_minutes)??settings.calendar_timezone_offset_minutes); }
+function eventTimezoneLabel(ev){ return normalizeCalendarTimezoneLabel(eventTimezoneMode(ev),(ev&&ev.timezone_label)||settings.calendar_timezone_label); }
 function eventWallClockDate(ev,time){
   const day=parseLocalDate(ev.event_date);
   const m=minutesOf(time)||0;
@@ -3169,8 +3190,9 @@ function bindEventForm(){
   const label=document.getElementById('ev_tz');
   if(mode&&label){
     mode.onchange=()=>{
-      if(mode.value==='server') label.value=settings.calendar_timezone_label||'CST';
-      if(mode.value==='fixed' && !/^GMT/i.test(label.value.trim())) label.value='GMT'+(Number(settings.calendar_timezone_offset_minutes||0)>=0?'+':'')+(Number(settings.calendar_timezone_offset_minutes||0)/60);
+      const nextLabel=calendarTimezoneDefaultLabel(mode.value);
+      label.innerHTML=calendarTimezoneLabelOptionsHtml(mode.value,nextLabel);
+      label.value=nextLabel;
     };
   }
 }
@@ -3180,8 +3202,8 @@ function raidEventFormHtml(ev, dateKey){
   const dateValue=fmtDateFull(ev?sameDayKey(ev.event_date):dateKey);
   const selectedDays=new Set((ev&&ev.recurrence==='weekly'?recurrenceDays(ev):[parseLocalDate(ev?ev.event_date:dateKey||new Date()).getDay()]).map(Number));
   const dayOptions=WEEKDAY_SHORT.map((label,dow)=>`<label><span>${esc(label)}</span><input type="checkbox" class="evDow" value="${dow}" ${selectedDays.has(dow)?'checked':''}></label>`).join('');
-  const tzMode=ev&&ev.timezone_mode?ev.timezone_mode:(settings.calendar_timezone_mode||'local');
-  const tzLabel=ev&&ev.timezone_label?ev.timezone_label:(settings.calendar_timezone_label||'America/Buenos_Aires');
+  const tzMode=ev&&ev.timezone_mode?ev.timezone_mode:(settings.calendar_timezone_mode||DEFAULT_CALENDAR_SETTINGS.calendar_timezone_mode);
+  const tzLabel=normalizeCalendarTimezoneLabel(tzMode,ev&&ev.timezone_label?ev.timezone_label:settings.calendar_timezone_label);
   return `<div class="row2"><div class="field"><label>Título</label><input id="ev_title" value="${esc(ev?ev.title:'Raid Main')}" placeholder="Raid Main"></div>
     <div class="field"><label>Tipo</label><select id="ev_type">${Object.entries(RAID_EVENT_TYPE).map(([k,l])=>`<option value="${k}" ${ev&&ev.event_type===k?'selected':''}>${l}</option>`).join('')}</select></div></div>
     <div class="row2"><div class="field"><label>Fecha</label><input id="ev_date" type="text" inputmode="numeric" value="${esc(dateValue)}" placeholder="dd/mm/aaaa"></div>
@@ -3189,8 +3211,8 @@ function raidEventFormHtml(ev, dateKey){
     <div class="row2"><div class="field"><label>Inicio</label><input id="ev_start" type="time" value="${esc(String(ev&&ev.start_time||'21:00').slice(0,5))}"></div>
     <div class="field"><label>Finalización</label><input id="ev_end" type="time" value="${esc(String(ev&&ev.end_time||'00:00').slice(0,5))}"></div></div>
     <div class="row2"><div class="field"><label>Recurrencia</label><select id="ev_recur"><option value="none">No repetir</option><option value="weekly" ${ev&&ev.recurrence==='weekly'?'selected':''}>Semanal (sin fecha final)</option></select></div>
-    <div class="field"><label>Modo horario</label><select id="ev_tz_mode"><option value="local" ${tzMode==='local'?'selected':''}>Horario local</option><option value="server" ${tzMode==='server'?'selected':''}>Server time${settings.calendar_timezone_label?` · ${esc(settings.calendar_timezone_label)}`:''}</option><option value="fixed" ${tzMode==='fixed'?'selected':''}>GMT fijo</option></select></div></div>
-    <div class="field"><label>Etiqueta horaria</label><input id="ev_tz" value="${esc(tzLabel)}" placeholder="CST / Server time / America/Buenos_Aires / GMT-3"></div>
+    <div class="field"><label>Modo horario</label><select id="ev_tz_mode"><option value="local" ${tzMode==='local'?'selected':''}>Horario local</option><option value="server" ${tzMode==='server'?'selected':''}>Server time · CST</option><option value="fixed" ${tzMode==='fixed'?'selected':''}>GMT fijo</option></select></div></div>
+    <div class="field"><label>Etiqueta horaria</label><select id="ev_tz">${calendarTimezoneLabelOptionsHtml(tzMode,tzLabel)}</select></div>
     <div class="field" id="ev_days_wrap"><label>Días de repetición</label><div class="dowGrid">${dayOptions}</div><div class="hint">Si marcás varios días, se repite semanalmente en todos esos días desde la fecha elegida.</div></div>
     ${recurring?`<div class="field"><label>Aplicar cambios</label><select id="ev_scope"><option value="one">Solo esta fecha</option><option value="future">Esta fecha y futuros materializados</option><option value="series_future">Serie hacia adelante</option></select></div>`:''}
     ${segmentEditorHtml(segs)}
@@ -3281,15 +3303,17 @@ async function materializeRecurringEvent(ev){
   const key=sameDayKey(ev.event_date);
   const existing=materializedEventForGroupDate(recurrenceGroup(template),key);
   if(existing) return existing;
+  const tzMode=template.timezone_mode||settings.calendar_timezone_mode||DEFAULT_CALENDAR_SETTINGS.calendar_timezone_mode;
+  const tzLabel=normalizeCalendarTimezoneLabel(tzMode,template.timezone_label||settings.calendar_timezone_label);
   const row={
     title:template.title,
     event_type:template.event_type,
     event_date:key,
     start_time:String(template.start_time||'21:00').slice(0,5),
     end_time:String(template.end_time||'00:00').slice(0,5),
-    timezone_mode:template.timezone_mode||settings.calendar_timezone_mode||'local',
-    timezone_offset_minutes:Number(template.timezone_offset_minutes??settings.calendar_timezone_offset_minutes??-180),
-    timezone_label:template.timezone_label||settings.calendar_timezone_label||'America/Buenos_Aires',
+    timezone_mode:tzMode,
+    timezone_offset_minutes:calendarTimezoneOffset(tzMode,tzLabel,template.timezone_offset_minutes??settings.calendar_timezone_offset_minutes),
+    timezone_label:tzLabel,
     recurrence:'none',
     recurrence_group_id:recurrenceGroup(template),
     recurrence_parent_id:template.id,
@@ -3336,6 +3360,8 @@ async function openRaidEventForm(eventId, dateKey){
     }
     openM2((ev?'Editar evento':'Nuevo evento'), raidEventFormHtml(ev,dateKey||isoLocal(new Date())), async()=>{
     const err=document.getElementById('ev_err'); err.textContent='';
+    const tzMode=document.getElementById('ev_tz_mode').value||settings.calendar_timezone_mode||DEFAULT_CALENDAR_SETTINGS.calendar_timezone_mode;
+    const tzLabel=normalizeCalendarTimezoneLabel(tzMode,document.getElementById('ev_tz').value||settings.calendar_timezone_label);
     const row={
       title:document.getElementById('ev_title').value.trim(),
       event_type:document.getElementById('ev_type').value,
@@ -3345,9 +3371,9 @@ async function openRaidEventForm(eventId, dateKey){
       status:document.getElementById('ev_status').value,
       recurrence:document.getElementById('ev_recur').value,
       recurrence_until:null,
-      timezone_mode:document.getElementById('ev_tz_mode').value||settings.calendar_timezone_mode||'local',
-      timezone_offset_minutes:Number(settings.calendar_timezone_offset_minutes)||-180,
-      timezone_label:document.getElementById('ev_tz').value.trim()||settings.calendar_timezone_label||'America/Buenos_Aires',
+      timezone_mode:tzMode,
+      timezone_offset_minutes:calendarTimezoneOffset(tzMode,tzLabel,settings.calendar_timezone_offset_minutes),
+      timezone_label:tzLabel,
       notes:document.getElementById('ev_notes').value.trim()||null
     };
     row.recurrence_days=selectedEventRecurrenceDays(row.event_date,row.recurrence);
@@ -3759,13 +3785,15 @@ function syncConfigHtml(){
 }
 function calendarConfigHtml(){
   const days=[['0','Domingo'],['1','Lunes'],['2','Martes'],['3','Miércoles'],['4','Jueves'],['5','Viernes'],['6','Sábado']];
+  const tzMode=String(settings.calendar_timezone_mode||DEFAULT_CALENDAR_SETTINGS.calendar_timezone_mode);
+  const tzLabel=normalizeCalendarTimezoneLabel(tzMode,settings.calendar_timezone_label);
   return `<div><label class="miniLabel">Calendario / attendance</label>
     <div class="adminFieldGrid">
       <div class="field"><label>Inicio de semana</label><select id="adminCalWeekStart">${days.map(([v,l])=>`<option value="${v}" ${String(settings.calendar_week_start_dow??2)===v?'selected':''}>${l}</option>`).join('')}</select></div>
-      <div class="field"><label>Modo horario</label><select id="adminCalTzMode"><option value="local" ${String(settings.calendar_timezone_mode||'local')==='local'?'selected':''}>Horario local</option><option value="server" ${String(settings.calendar_timezone_mode||'local')==='server'?'selected':''}>Server time</option><option value="fixed" ${String(settings.calendar_timezone_mode||'local')==='fixed'?'selected':''}>GMT fijo</option></select></div>
-      <div class="field"><label>Offset GMT minutos</label><input id="adminCalTzOffset" type="number" step="1" value="${Number(settings.calendar_timezone_offset_minutes??-180)}"><div class="hint">Argentina: -180. Server/CST si 19:30 = 22:30 Argentina: -360.</div></div>
+      <div class="field"><label>Modo horario</label><select id="adminCalTzMode"><option value="local" ${tzMode==='local'?'selected':''}>Horario local</option><option value="server" ${tzMode==='server'?'selected':''}>Server time · CST</option><option value="fixed" ${tzMode==='fixed'?'selected':''}>GMT fijo</option></select></div>
+      <div class="field"><label>Offset GMT minutos</label><input id="adminCalTzOffset" type="number" step="1" value="${calendarTimezoneOffset(tzMode,tzLabel,settings.calendar_timezone_offset_minutes)}"><div class="hint">Argentina: -180. Server/CST si 19:30 = 22:30 Argentina: -360.</div></div>
     </div>
-    <div class="field" style="margin-top:10px"><label>Etiqueta horaria</label><input id="adminCalTzLabel" value="${esc(settings.calendar_timezone_label||'America/Buenos_Aires')}" placeholder="CST / Server time / America/Buenos_Aires / GMT-3"></div>
+    <div class="field" style="margin-top:10px"><label>Etiqueta horaria</label><select id="adminCalTzLabel">${calendarTimezoneLabelOptionsHtml(tzMode,tzLabel)}</select></div>
   </div>`;
 }
 function renderAdmin(){
@@ -3800,14 +3828,9 @@ function renderAdmin(){
   if(adminTzMode) adminTzMode.onchange=()=>{
     const offset=document.getElementById('adminCalTzOffset');
     const label=document.getElementById('adminCalTzLabel');
-    if(adminTzMode.value==='server'){
-      if(offset && (!offset.value || Number(offset.value)===Number(DEFAULT_CALENDAR_SETTINGS.calendar_timezone_offset_minutes))) offset.value='-360';
-      if(label && (!label.value || label.value==='America/Buenos_Aires')) label.value='CST / Server time';
-    }
-    if(adminTzMode.value==='local'){
-      if(offset && (!offset.value || Number(offset.value)===-360)) offset.value=String(DEFAULT_CALENDAR_SETTINGS.calendar_timezone_offset_minutes);
-      if(label && (!label.value || label.value==='CST / Server time')) label.value=DEFAULT_CALENDAR_SETTINGS.calendar_timezone_label;
-    }
+    const nextLabel=calendarTimezoneDefaultLabel(adminTzMode.value);
+    if(label){ label.innerHTML=calendarTimezoneLabelOptionsHtml(adminTzMode.value,nextLabel); label.value=nextLabel; }
+    if(offset) offset.value=String(calendarTimezoneOffset(adminTzMode.value,nextLabel,DEFAULT_CALENDAR_SETTINGS.calendar_timezone_offset_minutes));
   };
 }
 async function saveAdminPermissions(){
@@ -3837,6 +3860,8 @@ async function saveAdminApiConfig(){
     if(!Number.isFinite(n)) return fallback;
     return Math.max(min,Math.min(max,Math.floor(n)));
   };
+  const calMode=document.getElementById('adminCalTzMode').value;
+  const calLabel=normalizeCalendarTimezoneLabel(calMode,document.getElementById('adminCalTzLabel').value);
   const patch={
     wcl_active_zone_ids:zoneIds,
     wcl_mplus_zone_id:mplus,
@@ -3853,9 +3878,9 @@ async function saveAdminApiConfig(){
     wcl_batch_size:intVal('adminWclBatch',DEFAULT_SYNC_SETTINGS.wcl_batch_size,0),
     wcl_batch_every_minutes:intVal('adminWclBatchEvery',DEFAULT_SYNC_SETTINGS.wcl_batch_every_minutes,0),
     calendar_week_start_dow:intVal('adminCalWeekStart',DEFAULT_CALENDAR_SETTINGS.calendar_week_start_dow,0,6),
-    calendar_timezone_mode:document.getElementById('adminCalTzMode').value,
-    calendar_timezone_offset_minutes:intVal('adminCalTzOffset',DEFAULT_CALENDAR_SETTINGS.calendar_timezone_offset_minutes,-840,840),
-    calendar_timezone_label:(document.getElementById('adminCalTzLabel').value||'America/Buenos_Aires').trim()
+    calendar_timezone_mode:calMode,
+    calendar_timezone_offset_minutes:calendarTimezoneOffset(calMode,calLabel,intVal('adminCalTzOffset',DEFAULT_CALENDAR_SETTINGS.calendar_timezone_offset_minutes,-840,840)),
+    calendar_timezone_label:calLabel
   };
   try{ await sbUpd('app_settings',1,patch); Object.assign(settings,patch); logAction('cambiar_api_config','settings','1',patch); await refresh(true); toast('Configuración guardada'); }
   catch(e){ toast('No se pudo guardar. ¿Corriste SQL 020?'); }
